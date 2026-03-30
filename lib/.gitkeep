@@ -1,0 +1,2 @@
+# Keep lib directory structure but ignore downloaded libraries
+# Libraries are downloaded via scripts/download-libs.sh during composer install

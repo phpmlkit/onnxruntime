@@ -1,0 +1,44 @@
+{
+  "name": "phpmlkit/onnxruntime-gpu",
+  "description": "High-performance ONNX Runtime bindings for PHP (GPU with CUDA support)",
+  "type": "platform-package",
+  "keywords": ["onnx", "onnxruntime", "machine-learning", "inference", "ml", "ai", "cuda", "gpu"],
+  "homepage": "https://github.com/phpmlkit/onnxruntime-gpu",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Kyrian Obikwelu",
+      "email": "kyrian@example.com"
+    }
+  ],
+  "require": {
+    "php": "^8.1",
+    "ext-ffi": "*",
+    "codewithkyrian/platform-package-installer": "^1.1"
+  },
+  "conflict": {
+    "phpmlkit/onnxruntime": "*",
+    "phpmlkit/onnxruntime-directml": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "PhpMlKit\\ONNXRuntime\\": "src/"
+    }
+  },
+  "bin": [
+    "scripts/download-onnxruntime"
+  ],
+  "extra": {
+    "platform-urls": {
+      "linux-x86_64": "https://github.com/phpmlkit/onnxruntime/releases/download/{version}/dist-linux-x86_64-cuda12.tar.gz",
+      "linux-arm64": "https://github.com/phpmlkit/onnxruntime/releases/download/{version}/dist-linux-arm64-cuda12.tar.gz",
+      "windows-x64": "https://github.com/phpmlkit/onnxruntime/releases/download/{version}/dist-windows-x64-cuda12.zip"
+    }
+  },
+  "scripts": {
+    "post-install-cmd": "bash scripts/download-onnxruntime",
+    "post-update-cmd": "bash scripts/download-onnxruntime"
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}

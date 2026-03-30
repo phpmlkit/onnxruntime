@@ -1,0 +1,35 @@
+/vendor/
+/composer.lock
+/.phpunit.result.cache
+/.phpunit.cache/
+/coverage-html/
+/.php-cs-fixer.cache
+
+# Platform-specific libraries (downloaded at install time)
+/lib/*/
+!/lib/.gitkeep
+
+# IDE
+/.idea/
+/.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test models (generated)
+/tests/Fixtures/models/*.onnx
+
+# Examples
+/examples/*.onnx
+
+# Shared files in all package subdirectories
+/packages/*/src/
+/packages/*/scripts/
+/packages/*/include/
+/packages/*/LICENSE
+/packages/*/.php-cs-fixer.php
+/packages/*/phpunit.xml

@@ -1,0 +1,33 @@
+{
+    "name": "phpmlkit/onnxruntime-directml",
+    "description": "High-performance ONNX Runtime bindings for PHP with GPU acceleration via DirectML on Windows",
+    "type": "library",
+    "keywords": ["onnx", "onnxruntime", "machine-learning", "ml", "ai", "directml", "windows", "gpu"],
+    "homepage": "https://github.com/phpmlkit/onnxruntime-directml",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Kyrian Obikwelu",
+            "email": "info@kyrian.me"
+        }
+    ],
+    "require": {
+        "php": ">=8.1",
+        "phpmlkit/onnxruntime": "^1.0"
+    },
+    "conflict": {
+        "phpmlkit/onnxruntime-gpu": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "PhpMlKit\\ONNXRuntime\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "PhpMlKit\\ONNXRuntime\\Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
