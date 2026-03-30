@@ -117,7 +117,8 @@ final class Lib
     {
         if (!isset(self::$libc)) {
             self::$libc = \FFI::cdef(
-                'size_t mbstowcs(void *wcstr, const char *mbstr, size_t count);'
+                'size_t mbstowcs(void *wcstr, const char *mbstr, size_t count);',
+                'msvcrt.dll'
             );
         }
 
