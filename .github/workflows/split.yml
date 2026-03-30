@@ -33,7 +33,7 @@ jobs:
       - name: Split ${{ matrix.package }}
         uses: claudiodekker/splitsh-action@v1.0.0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.SPLIT_TOKEN }}
         with:
           prefix: "packages/${{ matrix.package }}"
           remote: "https://github.com/phpmlkit/${{ matrix.package }}.git"
