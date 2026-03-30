@@ -7,7 +7,8 @@
          requireCoverageMetadata="false"
          beStrictAboutOutputDuringTests="true"
          failOnRisky="true"
-         failOnWarning="true">
+         failOnWarning="true"
+         bootstrap="tests/bootstrap.php">
     <testsuites>
         <testsuite name="tests">
             <directory>tests</directory>

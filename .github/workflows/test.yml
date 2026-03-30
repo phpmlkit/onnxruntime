@@ -18,20 +18,21 @@ jobs:
           - platform: linux-arm64
             runner: ubuntu-24.04-arm
           - platform: darwin-x86_64
-            runner: macos-13
+            runner: macos-15-intel
           - platform: darwin-arm64
             runner: macos-latest
-          - platform: windows-x64
+          - platform: windows-64
             runner: windows-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
+          extensions: ffi
           coverage: none
 
       - name: Install dependencies
