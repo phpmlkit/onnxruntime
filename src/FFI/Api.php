@@ -202,7 +202,7 @@ class Api
      */
     public function enableProfiling(CData $options, string $profileFilePrefix): void
     {
-        $status = ($this->api->EnableProfiling)($options, $profileFilePrefix);
+        $status = ($this->api->EnableProfiling)($options, Lib::ortString($profileFilePrefix));
         Lib::checkStatus($status);
     }
 
@@ -261,7 +261,7 @@ class Api
     public function createSession(CData $env, string $modelPath, SessionOptions $options): CData
     {
         $session = $this->ffi->new('OrtSession*');
-        $status = ($this->api->CreateSession)($env, $modelPath, $options->getHandle(), \FFI::addr($session));
+        $status = ($this->api->CreateSession)($env, Lib::ortString($modelPath), $options->getHandle(), \FFI::addr($session));
         Lib::checkStatus($status);
 
         return $session;

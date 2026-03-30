@@ -124,6 +124,35 @@ final class Lib
         return self::$libc;
     }
 
+    /**
+     * Convert a PHP string into the proper ONNX Runtime path string type.
+     *
+     * ONNX Runtime uses ORTCHAR_T for paths:
+     * - Windows: UTF-16 (wide)
+     * - Others:  UTF-8 (char*)
+     *
+     * @return string|CData
+     */
+    public static function ortString(string $value): string|CData
+    {
+        if (\PHP_OS_FAMILY !== 'Windows') {
+            return $value;
+        }
+
+        $libc = self::libc();
+        $strlen = \strlen($value);
+        $maxChars = $strlen + 1;
+
+        $dest = $libc->new('char[' . ($maxChars * 2) . ']');
+        $ret = (int) $libc->mbstowcs($dest, $value, $maxChars);
+
+        if ($ret != $strlen) {
+            throw new \RuntimeException('Expected mbstowcs to return ' . $strlen . ", got $ret");
+        }
+
+        return $dest;
+    }
+
     private static function create(): \FFI
     {
         $platform = self::detectPlatform();
