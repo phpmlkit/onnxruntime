@@ -28,10 +28,6 @@ final class Lib
             'directory' => 'linux-arm64',
             'libraryTemplate' => 'libonnxruntime.so.{version}',
         ],
-        'darwin-x86_64' => [
-            'directory' => 'darwin-x86_64',
-            'libraryTemplate' => 'libonnxruntime.{version}.dylib',
-        ],
         'darwin-arm64' => [
             'directory' => 'darwin-arm64',
             'libraryTemplate' => 'libonnxruntime.{version}.dylib',
@@ -220,7 +216,7 @@ final class Lib
             throw new \RuntimeException("Could not read header: {$headerPath}");
         }
 
-        if (\PHP_OS_FAMILY == 'Darwin' && 'x86_64' != php_uname('m')) {
+        if (\PHP_OS_FAMILY == 'Darwin') {
             $coremlHeaderPath = __DIR__.'/../../include/onnxruntime_coreml_provider.h';
             $header .= "\n" . file_get_contents($coremlHeaderPath);
         }

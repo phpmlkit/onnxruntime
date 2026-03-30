@@ -86,13 +86,13 @@ get_download_info() {
             filename="onnxruntime-osx-arm64-${VERSION}.tgz"
             lib_name="libonnxruntime.${VERSION}.dylib"
             ;;
-        osx-x64)
-            filename="onnxruntime-osx-x86_64-${VERSION}.tgz"
-            lib_name="libonnxruntime.${VERSION}.dylib"
-            ;;
         win-x64)
             filename="onnxruntime-win-x64-${VERSION}.zip"
             lib_name="onnxruntime.dll"
+            ;;
+        osx-x64)
+            log_error "macOS Intel (x86_64) not supported"
+            exit 1
             ;;
         *)
             log_error "Unknown platform: $platform"
@@ -129,9 +129,6 @@ download_library() {
             ;;
         osx-arm64)
             platform_dir="darwin-arm64"
-            ;;
-        osx-x64)
-            platform_dir="darwin-x86_64"
             ;;
         win-x64)
             platform_dir="windows-x64"

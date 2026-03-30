@@ -83,7 +83,6 @@ ffi.enable=true
 |----------|-------------|--------|
 | Linux | x86_64 | ✅ Supported |
 | Linux | ARM64 | ✅ Supported |
-| macOS | Intel (x86_64) | ✅ Supported |
 | macOS | Apple Silicon (ARM64) | ✅ Supported |
 | Windows | x64 | ✅ Supported |
 
@@ -790,7 +789,7 @@ $session->close();  // Profile saved to my_model_profile_*.json
 This library supports the following platforms and architectures:
 
 - ✅ **Linux**: x86_64, ARM64
-- ✅ **macOS**: Intel (x86_64), Apple Silicon (ARM64)
+- ✅ **macOS**: Apple Silicon (ARM64)
 - ✅ **Windows**: x64
 
 ### Execution Provider Support
