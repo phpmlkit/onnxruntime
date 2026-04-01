@@ -16,14 +16,14 @@ use PhpMlKit\ONNXRuntime\FFI\Lib;
 final class CudaProviderOptions extends V2ProviderOptions
 {
     /**
-     * @param int $deviceId CUDA device ID (0 = default)
-     * @param null|int $gpuMemoryLimit Maximum GPU memory in bytes (null = unlimited)
-     * @param null|CudnnConvAlgoSearch $cudnnConvAlgoSearch CUDNN convolution algorithm search
-     * @param null|ArenaExtendStrategy $arenaExtendStrategy Memory arena extension strategy
-     * @param bool $doCopyInDefaultStream Use same stream for copy and compute
-     * @param bool $tunableOpEnable Enable TunableOp
-     * @param bool $tunableOpTuningEnable Enable TunableOp tuning
-     * @param int $tunableOpMaxTuningDurationMs Max tuning duration per op (0 = unlimited)
+     * @param int                      $deviceId                     CUDA device ID (0 = default)
+     * @param null|int                 $gpuMemoryLimit               Maximum GPU memory in bytes (null = unlimited)
+     * @param null|CudnnConvAlgoSearch $cudnnConvAlgoSearch          CUDNN convolution algorithm search
+     * @param null|ArenaExtendStrategy $arenaExtendStrategy          Memory arena extension strategy
+     * @param bool                     $doCopyInDefaultStream        Use same stream for copy and compute
+     * @param bool                     $tunableOpEnable              Enable TunableOp
+     * @param bool                     $tunableOpTuningEnable        Enable TunableOp tuning
+     * @param int                      $tunableOpMaxTuningDurationMs Max tuning duration per op (0 = unlimited)
      */
     public function __construct(
         public readonly int $deviceId = 0,

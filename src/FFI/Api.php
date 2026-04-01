@@ -886,34 +886,6 @@ class Api
     }
 
     /**
-     * Get the DirectML API struct.
-     *
-     * @return CData OrtDmlApi pointer
-     *
-     * @throws Exception if DML API is not available
-     */
-    private function getDmlApi(): CData
-    {
-        static $dmlApi = null;
-
-        if (null === $dmlApi) {
-            $dmlApiPtr = $this->ffi->new('OrtDmlApi*');
-
-            // GetExecutionProviderApi should be in the main OrtApi struct
-            if (!isset($this->api->GetExecutionProviderApi)) {
-                throw new \RuntimeException('GetExecutionProviderApi not available in this ONNX Runtime version');
-            }
-
-            $status = ($this->api->GetExecutionProviderApi)('DML', \FFI::addr($dmlApiPtr));
-            Lib::checkStatus($status);
-
-            $dmlApi = $dmlApiPtr;
-        }
-
-        return $dmlApi;
-    }
-
-    /**
      * Append generic execution provider.
      *
      * @param CData                $options   OrtSessionOptions pointer
@@ -925,10 +897,10 @@ class Api
     public function sessionOptionsAppendExecutionProvider(CData $options, string $name, array $keyValues = []): void
     {
         $numKeys = \count($keyValues);
-        
+
         // Always create arrays even if empty - passing null can cause segfaults
-        $keysPtr = $numKeys > 0 ? $this->ffi->new('char*[' . $numKeys . ']') : $this->ffi->new('char*[1]');
-        $valuesPtr = $numKeys > 0 ? $this->ffi->new('char*[' . $numKeys . ']') : $this->ffi->new('char*[1]');
+        $keysPtr = $numKeys > 0 ? $this->ffi->new('char*['.$numKeys.']') : $this->ffi->new('char*[1]');
+        $valuesPtr = $numKeys > 0 ? $this->ffi->new('char*['.$numKeys.']') : $this->ffi->new('char*[1]');
 
         if ($numKeys > 0) {
             $keys = [];
@@ -944,12 +916,12 @@ class Api
             $valueArrays = [];
 
             for ($i = 0; $i < $numKeys; ++$i) {
-                $keyArrays[$i] = $this->ffi->new('char[' . (\strlen($keys[$i]) + 1) . ']');
+                $keyArrays[$i] = $this->ffi->new('char['.(\strlen($keys[$i]) + 1).']');
                 \FFI::memcpy($keyArrays[$i], $keys[$i], \strlen($keys[$i]));
                 $keyArrays[$i][\strlen($keys[$i])] = "\0";
                 $keysPtr[$i] = $this->ffi->cast('char*', $keyArrays[$i]);
 
-                $valueArrays[$i] = $this->ffi->new('char[' . (\strlen($values[$i]) + 1) . ']');
+                $valueArrays[$i] = $this->ffi->new('char['.(\strlen($values[$i]) + 1).']');
                 \FFI::memcpy($valueArrays[$i], $values[$i], \strlen($values[$i]));
                 $valueArrays[$i][\strlen($values[$i])] = "\0";
                 $valuesPtr[$i] = $this->ffi->cast('char*', $valueArrays[$i]);
@@ -1009,14 +981,14 @@ class Api
             $values[] = $value;
         }
 
-        $keysPtr = $this->ffi->new('char*[' . $numKeys . ']');
-        $valuesPtr = $this->ffi->new('char*[' . $numKeys . ']');
+        $keysPtr = $this->ffi->new('char*['.$numKeys.']');
+        $valuesPtr = $this->ffi->new('char*['.$numKeys.']');
 
         for ($i = 0; $i < $numKeys; ++$i) {
-            $keysPtr[$i] = $this->ffi->new('char[' . (\strlen($keys[$i]) + 1) . ']');
+            $keysPtr[$i] = $this->ffi->new('char['.(\strlen($keys[$i]) + 1).']');
             \FFI::memcpy($keysPtr[$i], $keys[$i], \strlen($keys[$i]));
 
-            $valuesPtr[$i] = $this->ffi->new('char[' . (\strlen($values[$i]) + 1) . ']');
+            $valuesPtr[$i] = $this->ffi->new('char['.(\strlen($values[$i]) + 1).']');
             \FFI::memcpy($valuesPtr[$i], $values[$i], \strlen($values[$i]));
         }
 
@@ -1074,7 +1046,7 @@ class Api
 
     /**
      * Update TensorRT provider options.
-     *  
+     *
      * @param CData                $options   OrtTensorRTProviderOptionsV2 pointer
      * @param array<string,string> $keyValues Key-value pairs of options
      *
@@ -1096,14 +1068,14 @@ class Api
             $values[] = $value;
         }
 
-        $keysPtr = $this->ffi->new('char*[' . $numKeys . ']');
-        $valuesPtr = $this->ffi->new('char*[' . $numKeys . ']');
+        $keysPtr = $this->ffi->new('char*['.$numKeys.']');
+        $valuesPtr = $this->ffi->new('char*['.$numKeys.']');
 
         for ($i = 0; $i < $numKeys; ++$i) {
-            $keysPtr[$i] = $this->ffi->new('char[' . (\strlen($keys[$i]) + 1) . ']');
+            $keysPtr[$i] = $this->ffi->new('char['.(\strlen($keys[$i]) + 1).']');
             \FFI::memcpy($keysPtr[$i], $keys[$i], \strlen($keys[$i]));
 
-            $valuesPtr[$i] = $this->ffi->new('char[' . (\strlen($values[$i]) + 1) . ']');
+            $valuesPtr[$i] = $this->ffi->new('char['.(\strlen($values[$i]) + 1).']');
             \FFI::memcpy($valuesPtr[$i], $values[$i], \strlen($values[$i]));
         }
 
@@ -1130,7 +1102,7 @@ class Api
     /**
      * Append TensorRT execution provider using V2 API.
      *
-     * @param CData $sessionOptions OrtSessionOptions pointer
+     * @param CData $sessionOptions  OrtSessionOptions pointer
      * @param CData $tensorrtOptions OrtTensorRTProviderOptionsV2 pointer
      *
      * @throws Exception on error
@@ -1462,5 +1434,33 @@ class Api
         Lib::checkStatus($status);
 
         return $providers;
+    }
+
+    /**
+     * Get the DirectML API struct.
+     *
+     * @return CData OrtDmlApi pointer
+     *
+     * @throws Exception if DML API is not available
+     */
+    private function getDmlApi(): CData
+    {
+        static $dmlApi = null;
+
+        if (null === $dmlApi) {
+            $dmlApiPtr = $this->ffi->new('OrtDmlApi*');
+
+            // GetExecutionProviderApi should be in the main OrtApi struct
+            if (!isset($this->api->GetExecutionProviderApi)) {
+                throw new \RuntimeException('GetExecutionProviderApi not available in this ONNX Runtime version');
+            }
+
+            $status = ($this->api->GetExecutionProviderApi)('DML', \FFI::addr($dmlApiPtr));
+            Lib::checkStatus($status);
+
+            $dmlApi = $dmlApiPtr;
+        }
+
+        return $dmlApi;
     }
 }

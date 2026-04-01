@@ -9,6 +9,11 @@ use PhpMlKit\ONNXRuntime\FFI\Lib;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @internal
+ *
+ * @coversNothing
+ */
 class ApiTest extends TestCase
 {
     protected function setUp(): void
@@ -31,7 +36,7 @@ class ApiTest extends TestCase
         $providers = $api->getAvailableProviders();
 
         $this->assertIsArray($providers);
-        $this->assertGreaterThanOrEqual(1, count($providers));
+        $this->assertGreaterThanOrEqual(1, \count($providers));
         $this->assertContains('CPUExecutionProvider', $providers);
     }
 }

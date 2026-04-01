@@ -127,10 +127,8 @@ final class Lib
      * ONNX Runtime uses ORTCHAR_T for paths:
      * - Windows: UTF-16 (wide)
      * - Others:  UTF-8 (char*)
-     *
-     * @return string|CData
      */
-    public static function ortString(string $value): string|CData
+    public static function ortString(string $value): CData|string
     {
         if (\PHP_OS_FAMILY !== 'Windows') {
             return $value;
@@ -140,11 +138,11 @@ final class Lib
         $strlen = \strlen($value);
         $maxChars = $strlen + 1;
 
-        $dest = $libc->new('char[' . ($maxChars * 2) . ']');
+        $dest = $libc->new('char['.($maxChars * 2).']');
         $ret = (int) $libc->mbstowcs($dest, $value, $maxChars);
 
         if ($ret != $strlen) {
-            throw new \RuntimeException('Expected mbstowcs to return ' . $strlen . ", got $ret");
+            throw new \RuntimeException('Expected mbstowcs to return '.$strlen.", got {$ret}");
         }
 
         return $dest;
@@ -218,12 +216,12 @@ final class Lib
 
         if (\PHP_OS_FAMILY == 'Darwin') {
             $coremlHeaderPath = __DIR__.'/../../include/onnxruntime_coreml_provider.h';
-            $header .= "\n" . file_get_contents($coremlHeaderPath);
+            $header .= "\n".file_get_contents($coremlHeaderPath);
         }
 
         if (\PHP_OS_FAMILY == 'Windows') {
             $dmlHeaderPath = __DIR__.'/../../include/onnxruntime_dml_provider.h';
-            $header .= "\n" . file_get_contents($dmlHeaderPath);
+            $header .= "\n".file_get_contents($dmlHeaderPath);
         }
 
         return $header;

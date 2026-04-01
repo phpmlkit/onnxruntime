@@ -14,22 +14,22 @@ use PhpMlKit\ONNXRuntime\FFI\Lib;
 final class TensorRTProviderOptions extends V2ProviderOptions
 {
     /**
-     * @param int $deviceId CUDA device ID (0 = default)
-     * @param int $trtMaxPartitionIterations Maximum iterations for TensorRT parser
-     * @param int $trtMinSubgraphSize Minimum subgraph size for TensorRT
-     * @param int $trtMaxWorkspaceSize Maximum workspace size in bytes
-     * @param bool $trtFp16Enable Enable FP16 precision
-     * @param bool $trtInt8Enable Enable INT8 precision
-     * @param null|string $trtInt8CalibrationTableName INT8 calibration table path
-     * @param bool $trtInt8UseNativeCalibrationTable Use native TensorRT calibration
-     * @param bool $trtDlaEnable Enable DLA (Deep Learning Accelerator)
-     * @param int $trtDlaCore DLA core to use (0 = default)
-     * @param bool $trtDumpSubgraphs Dump TensorRT subgraphs
-     * @param bool $trtEngineCacheEnable Enable engine caching
-     * @param null|string $trtEngineCachePath Path for cached engines
-     * @param bool $trtEngineDecryptionEnable Enable engine decryption
-     * @param null|string $trtEngineDecryptionLibPath Path to decryption library
-     * @param bool $trtForceSequentialEngineBuild Force sequential engine building
+     * @param int         $deviceId                         CUDA device ID (0 = default)
+     * @param int         $trtMaxPartitionIterations        Maximum iterations for TensorRT parser
+     * @param int         $trtMinSubgraphSize               Minimum subgraph size for TensorRT
+     * @param int         $trtMaxWorkspaceSize              Maximum workspace size in bytes
+     * @param bool        $trtFp16Enable                    Enable FP16 precision
+     * @param bool        $trtInt8Enable                    Enable INT8 precision
+     * @param null|string $trtInt8CalibrationTableName      INT8 calibration table path
+     * @param bool        $trtInt8UseNativeCalibrationTable Use native TensorRT calibration
+     * @param bool        $trtDlaEnable                     Enable DLA (Deep Learning Accelerator)
+     * @param int         $trtDlaCore                       DLA core to use (0 = default)
+     * @param bool        $trtDumpSubgraphs                 Dump TensorRT subgraphs
+     * @param bool        $trtEngineCacheEnable             Enable engine caching
+     * @param null|string $trtEngineCachePath               Path for cached engines
+     * @param bool        $trtEngineDecryptionEnable        Enable engine decryption
+     * @param null|string $trtEngineDecryptionLibPath       Path to decryption library
+     * @param bool        $trtForceSequentialEngineBuild    Force sequential engine building
      */
     public function __construct(
         public readonly int $deviceId = 0,

@@ -16,6 +16,21 @@ use FFI\CData;
  */
 abstract class V2ProviderOptions implements ProviderOptions
 {
+    public function applyToSession(CData $sessionOptions): void
+    {
+        $options = null;
+
+        try {
+            $options = $this->createOptions();
+            $this->updateOptions($options);
+            $this->appendProvider($sessionOptions, $options);
+        } finally {
+            if (null !== $options) {
+                $this->releaseOptions($options);
+            }
+        }
+    }
+
     /**
      * Create the provider options struct.
      *
@@ -33,7 +48,7 @@ abstract class V2ProviderOptions implements ProviderOptions
     /**
      * Append the provider to session options.
      *
-     * @param CData $sessionOptions The session options handle
+     * @param CData $sessionOptions  The session options handle
      * @param CData $providerOptions The provider options struct handle
      */
     abstract protected function appendProvider(CData $sessionOptions, CData $providerOptions): void;
@@ -44,19 +59,4 @@ abstract class V2ProviderOptions implements ProviderOptions
      * @param CData $options The provider options struct handle
      */
     abstract protected function releaseOptions(CData $options): void;
-
-    public function applyToSession(CData $sessionOptions): void
-    {
-        $options = null;
-
-        try {
-            $options = $this->createOptions();
-            $this->updateOptions($options);
-            $this->appendProvider($sessionOptions, $options);
-        } finally {
-            if (null !== $options) {
-                $this->releaseOptions($options);
-            }
-        }
-    }
 }

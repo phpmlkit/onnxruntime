@@ -77,15 +77,6 @@ extension=ffi
 ffi.enable=true
 ```
 
-### Supported Platforms
-
-| Platform | Architecture | Status |
-|----------|-------------|--------|
-| Linux | x86_64 | ✅ Supported |
-| Linux | ARM64 | ✅ Supported |
-| macOS | Apple Silicon (ARM64) | ✅ Supported |
-| Windows | x64 | ✅ Supported |
-
 ## Installation
 
 Install via Composer:
@@ -94,14 +85,42 @@ Install via Composer:
 composer require phpmlkit/onnxruntime
 ```
 
-Need GPU acceleration? Install the GPU package instead:
+By default, this installs the `cpu` runtime for your platform.
+
+To use a different runtime, set a runtime override in your application's `composer.json`:
+
+```json
+{
+  "extra": {
+    "platform-packages": {
+      "phpmlkit/onnxruntime": {
+        "runtime": "cuda12"
+      }
+    }
+  }
+}
+```
+
+And then reinstall the package to fetch the correct distribution archive:
 
 ```bash
-composer require phpmlkit/onnxruntime-gpu
+composer reinstall phpmlkit/onnxruntime
 ```
 
 > [!IMPORTANT]
-> Run `composer require` on your target platform. The package includes the native ONNX Runtime library bundled for your specific OS and architecture (Linux/macOS/Windows, x86_64/ARM64).
+> Run `composer require` or `composer reinstall` on your target platform. Release artifacts include platform-specific native binaries.
+
+### Runtime Variants
+
+| Platform         | Supported Runtimes        |
+|------------------|--------------------------|
+| Linux x86_64     | `cpu`, `cuda12`, `cuda13`|
+| Linux ARM64      | `cpu`                    |
+| macOS ARM64      | `cpu`                    |
+| Windows x64      | `cpu`, `cuda12`, `cuda13`|
+
+> [!NOTE]
+> If your configured runtime is unavailable for your platform, composer will fall back to the `cpu` runtime.
 
 ### Manual Library Download
 
@@ -110,6 +129,20 @@ If the native library is missing from your installation, download it manually:
 ```bash
 ./vendor/bin/download-onnxruntime
 ```
+
+Download with specific options:
+
+```bash
+./vendor/bin/download-onnxruntime --runtime cuda12
+./vendor/bin/download-onnxruntime --runtime cuda13
+./vendor/bin/download-onnxruntime --platform windows-x64
+./vendor/bin/download-onnxruntime --version 1.24.3
+```
+
+Supported script options:
+- `--runtime <cpu|cuda12|cuda13>`
+- `--platform <linux-x86_64|linux-arm64|darwin-arm64|windows-x64>`
+- `--version <onnx-runtime-version>`
 
 **You might need this if:**
 - You installed a dev version (branch/tag instead of a release)
@@ -784,35 +817,38 @@ for ($i = 0; $i < 100; $i++) {
 $session->close();  // Profile saved to my_model_profile_*.json
 ```
 
-## Supported Platforms
-
-This library supports the following platforms and architectures:
-
-- ✅ **Linux**: x86_64, ARM64
-- ✅ **macOS**: Apple Silicon (ARM64)
-- ✅ **Windows**: x64
-
 ### Execution Provider Support
 
-| Provider | Package | Status | Platforms |
+| Provider | Runtime | Status | Platforms |
 |----------|---------|--------|-----------|
-| **CPU** | `phpmlkit/onnxruntime` | ✅ Included | All |
-| **CUDA** | `phpmlkit/onnxruntime-gpu` | ✅ Available | Linux x64/ARM64, Windows x64 |
-| **CoreML** | `phpmlkit/onnxruntime` | ✅ Included | macOS only |
-| **DirectML** | (coming soon) | 🚧 Planned | Windows only |
+| **CPUExecutionProvider** | `cpu` | ✅ Included | Linux x86_64/ARM64, macOS ARM64, Windows x64 |
+| **CUDAExecutionProvider (CUDA 12)** | `cuda12` | ✅ Available | Linux x86_64, Windows x64 |
+| **CUDAExecutionProvider (CUDA 13)** | `cuda13` | ✅ Available | Linux x86_64, Windows x64 |
+| **CoreMLExecutionProvider** | `cpu` | ✅ Included | macOS ARM64 |
+| **DirectMLExecutionProvider** | N/A | 🚧 Planned | Windows x64 |
 
 **Not supported:**
 - **32-bit Systems**: Only 64-bit architectures
 - **WebAssembly**: Not supported
 
-To use GPU acceleration, install the GPU package:
-```bash
-composer require phpmlkit/onnxruntime-gpu
+To switch runtime variants, update your root `composer.json` and reinstall:
+
+```json
+{
+  "extra": {
+    "platform-packages": {
+      "phpmlkit/onnxruntime": {
+        "runtime": "cuda13"
+      }
+    }
+  }
+}
 ```
 
-See [packages/onnxruntime-gpu/README.md](packages/onnxruntime-gpu/README.md) for GPU-specific setup instructions.
-
-The native ONNX Runtime library is automatically downloaded for your platform during installation. If you need to support additional platforms, please open an issue.
+```bash
+composer reinstall phpmlkit/onnxruntime
+```
+The native ONNX Runtime library is automatically bundled for your selected runtime and platform in release artifacts. If you need to support additional platforms, please open an issue.
 
 ## FFI Direct Access
 
@@ -847,16 +883,6 @@ The C API header is located at `vendor/phpmlkit/onnxruntime/include/onnxruntime.
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-### Monorepo Structure
-
-This project uses a monorepo structure. The main repository contains all development code, and package variants (CPU, GPU) are automatically split to separate repositories:
-
-- **Main repo** (this one): Development, documentation, issues
-- **CPU package**: [`phpmlkit/onnxruntime-cpu`](https://github.com/phpmlkit/onnxruntime-cpu)
-- **GPU package**: [`phpmlkit/onnxruntime-gpu`](https://github.com/phpmlkit/onnxruntime-gpu)
-
-See [MONOREPO.md](MONOREPO.md) for detailed information about the monorepo workflow, including how packages are split and how to contribute.
 
 ### Development Setup
 

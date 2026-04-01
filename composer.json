@@ -1,7 +1,7 @@
 {
   "name": "phpmlkit/onnxruntime",
   "description": "High-performance ONNX Runtime bindings for PHP",
-  "type": "project",
+  "type": "platform-package",
   "readme": "README.md",
   "keywords": ["onnx", "onnxruntime", "machine-learning", "inference", "ml", "ai"],
   "homepage": "https://github.com/phpmlkit/onnxruntime",
@@ -15,7 +15,7 @@
   "require": {
     "php": "^8.1",
     "ext-ffi": "*",
-    "codewithkyrian/platform-package-installer": "^1.1"
+    "codewithkyrian/platform-package-installer": "^2.0"
   },
   "require-dev": {
     "phpunit/phpunit": "^10.0",
@@ -37,12 +37,17 @@
   "bin": [
     "scripts/download-onnxruntime"
   ],
-    "extra": {
-    "platform-urls": {
-      "linux-x86_64": "https://github.com/phpmlkit/onnxruntime/releases/download/{version}/dist-linux-x86_64.tar.gz",
-      "linux-arm64": "https://github.com/phpmlkit/onnxruntime/releases/download/{version}/dist-linux-arm64.tar.gz",
-      "darwin-arm64": "https://github.com/phpmlkit/onnxruntime/releases/download/{version}/dist-darwin-arm64.tar.gz",
-      "windows-x64": "https://github.com/phpmlkit/onnxruntime/releases/download/{version}/dist-windows-x64.zip"
+  "extra": {
+    "artifacts": {
+      "urls": {
+        "linux-x86_64": "https://github.com/phpmlkit/onnxruntime/releases/download/{version}/dist-linux-x86_64-{runtime}.tar.gz",
+        "linux-arm64": "https://github.com/phpmlkit/onnxruntime/releases/download/{version}/dist-linux-arm64-{runtime}.tar.gz",
+        "darwin-arm64": "https://github.com/phpmlkit/onnxruntime/releases/download/{version}/dist-darwin-arm64-{runtime}.tar.gz",
+        "windows-x64": "https://github.com/phpmlkit/onnxruntime/releases/download/{version}/dist-windows-x64-{runtime}.zip"
+      },
+      "vars": {
+        "runtime": "cpu"
+      }
     }
   },
   "scripts": {
@@ -53,12 +58,7 @@
     "test:coverage": "./vendor/bin/phpunit --coverage-text",
     "cs:fix": "./vendor/bin/php-cs-fixer fix",
     "cs:check": "./vendor/bin/php-cs-fixer fix --dry-run --diff",
-    "lint": "./vendor/bin/phpstan analyse src tests --level=8",
-    "monorepo:prepare": "bash scripts/prepare-packages.sh",
-    "monorepo:split": [
-      "@monorepo:prepare",
-      "echo 'Packages prepared. Run the split workflow via GitHub Actions or manually with splitsh-lite'"
-    ]
+    "lint": "./vendor/bin/phpstan analyse src tests --level=8"
   },
   "config": {
     "sort-packages": true,

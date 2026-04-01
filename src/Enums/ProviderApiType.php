@@ -11,14 +11,14 @@ enum ProviderApiType
 {
     /**
      * Legacy API with simple device_id parameter.
-     * Example: SessionOptionsAppendExecutionProvider_CUDA(options, device_id)
+     * Example: SessionOptionsAppendExecutionProvider_CUDA(options, device_id).
      */
     case LEGACY;
 
     /**
      * V2 API with complex options struct.
      * Requires Create/Update/Release lifecycle management.
-     * Example: CreateCUDAProviderOptions -> UpdateCUDAProviderOptions -> Append -> Release
+     * Example: CreateCUDAProviderOptions -> UpdateCUDAProviderOptions -> Append -> Release.
      */
     case V2;
 

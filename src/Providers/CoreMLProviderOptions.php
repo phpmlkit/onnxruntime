@@ -14,6 +14,7 @@ use PhpMlKit\ONNXRuntime\FFI\Lib;
  * CoreML execution provider options for Apple devices.
  *
  * This class provides a type-safe interface to CoreML EP options as documented at:
+ *
  * @see https://onnxruntime.ai/docs/execution-providers/CoreML-ExecutionProvider.html#configuration-options
  * @see https://github.com/microsoft/onnxruntime/blob/main/onnxruntime/core/providers/coreml/coreml_provider_factory.h
  */

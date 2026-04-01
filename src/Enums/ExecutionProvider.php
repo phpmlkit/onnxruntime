@@ -147,6 +147,7 @@ enum ExecutionProvider: string
     {
         try {
             $availableProviders = Lib::api()->getAvailableProviders();
+
             return \in_array($this->value, $availableProviders, true);
         } catch (\Throwable $e) {
             return false;

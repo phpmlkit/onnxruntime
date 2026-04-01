@@ -28,8 +28,8 @@ use PhpMlKit\ONNXRuntime\FFI\Lib;
 final class GenericProviderOptions implements ProviderOptions
 {
     /**
-     * @param ExecutionProvider $provider The execution provider type
-     * @param array<string, string> $options Provider-specific key-value options
+     * @param ExecutionProvider     $provider The execution provider type
+     * @param array<string, string> $options  Provider-specific key-value options
      */
     public function __construct(
         public readonly ExecutionProvider $provider,
