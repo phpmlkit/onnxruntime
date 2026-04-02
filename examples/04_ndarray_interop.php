@@ -20,6 +20,7 @@ $modelPath = __DIR__.'/../tests/Fixtures/models/identity.onnx';
 
 if (!file_exists($modelPath)) {
     echo "ERROR: Model file not found: {$modelPath}\n";
+
     exit(1);
 }
 

@@ -67,7 +67,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download ONNX Runtime binaries
         shell: bash
@@ -135,7 +135,7 @@ jobs:
 
       - name: Upload to Artifacts (workflow dispatch)
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist-${{ matrix.platform }}-${{ matrix.runtime }}
           path: dist-${{ matrix.platform }}-${{ matrix.runtime }}.${{ matrix.archive_ext }}

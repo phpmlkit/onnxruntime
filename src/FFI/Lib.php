@@ -185,7 +185,7 @@ final class Lib
 
     private static function findLibrary(array $config): ?string
     {
-        $libDir = __DIR__.'/../../lib/'.$config['directory'].'/lib';
+        $libDir = __DIR__.'/../../lib/'.$config['directory'];
 
         // Replace {version} in template
         $libraryName = str_replace('{version}', self::VERSION, $config['libraryTemplate']);

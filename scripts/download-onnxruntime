@@ -228,7 +228,7 @@ download_library() {
             ;;
     esac
     
-    local platform_lib_dir="${LIB_DIR}/${platform_dir}/lib"
+    local platform_lib_dir="${LIB_DIR}/${platform_dir}"
     
     # Check if already exists
     if [ -f "${platform_lib_dir}/${lib_name}" ]; then

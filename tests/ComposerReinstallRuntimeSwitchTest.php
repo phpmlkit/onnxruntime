@@ -4,36 +4,37 @@ declare(strict_types=1);
 
 namespace PhpMlKit\ONNXRuntime\Tests;
 
-use FilesystemIterator;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
-use RuntimeException;
-use ZipArchive;
 
+/**
+ * @internal
+ *
+ * @coversNothing
+ */
 final class ComposerReinstallRuntimeSwitchTest extends TestCase
 {
     #[Test]
     public function composerReinstallSwitchesRuntimeArtifact(): void
     {
-        if (!class_exists(ZipArchive::class)) {
+        if (!class_exists(\ZipArchive::class)) {
             $this->markTestSkipped('ZipArchive extension is required for integration test.');
         }
 
         $repoRoot = realpath(__DIR__.'/..');
         self::assertNotFalse($repoRoot);
 
-        $tmpRoot = sys_get_temp_dir().DIRECTORY_SEPARATOR.'onnxruntime-composer-int-'.uniqid('', true);
-        $pluginCopyPath = $tmpRoot.DIRECTORY_SEPARATOR.'platform-package-installer';
-        $distPath = $tmpRoot.DIRECTORY_SEPARATOR.'dist';
-        $appPath = $tmpRoot.DIRECTORY_SEPARATOR.'app';
+        $tmpRoot = sys_get_temp_dir().\DIRECTORY_SEPARATOR.'onnxruntime-composer-int-'.uniqid('', true);
+        $pluginCopyPath = $tmpRoot.\DIRECTORY_SEPARATOR.'platform-package-installer';
+        $distPath = $tmpRoot.\DIRECTORY_SEPARATOR.'dist';
+        $appPath = $tmpRoot.\DIRECTORY_SEPARATOR.'app';
 
         mkdir($tmpRoot, 0777, true);
         mkdir($distPath, 0777, true);
         mkdir($appPath, 0777, true);
 
         $server = null;
+
         try {
             $pluginSource = $repoRoot.'/vendor/codewithkyrian/platform-package-installer';
             $this->copyDirectory($pluginSource, $pluginCopyPath, ['vendor', 'tests', '.git', '.github']);
@@ -96,7 +97,7 @@ final class ComposerReinstallRuntimeSwitchTest extends TestCase
 
             file_put_contents(
                 $appPath.'/composer.json',
-                json_encode($composerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+                json_encode($composerJson, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES)
             );
 
             $composerBin = $this->findComposerBinary($repoRoot);
@@ -106,7 +107,7 @@ final class ComposerReinstallRuntimeSwitchTest extends TestCase
             ];
 
             $install = $this->runCommand(
-                [PHP_BINARY, $composerBin, 'install', '--no-interaction', '--no-progress'],
+                [\PHP_BINARY, $composerBin, 'install', '--no-interaction', '--no-progress'],
                 $appPath,
                 $env,
                 120
@@ -125,11 +126,11 @@ final class ComposerReinstallRuntimeSwitchTest extends TestCase
 
             file_put_contents(
                 $appPath.'/composer.json',
-                json_encode($updatedJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+                json_encode($updatedJson, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES)
             );
 
             $reinstall = $this->runCommand(
-                [PHP_BINARY, $composerBin, 'reinstall', 'phpmlkit/onnxruntime', '--no-interaction', '--no-progress'],
+                [\PHP_BINARY, $composerBin, 'reinstall', 'phpmlkit/onnxruntime', '--no-interaction', '--no-progress'],
                 $appPath,
                 $env,
                 120
@@ -137,7 +138,7 @@ final class ComposerReinstallRuntimeSwitchTest extends TestCase
             self::assertSame(0, $reinstall['exit_code'], "composer reinstall failed\n{$reinstall['stderr']}\n{$reinstall['stdout']}");
             self::assertSame('cuda12', $this->readRuntimeMarker($appPath));
         } finally {
-            if (is_array($server)) {
+            if (\is_array($server)) {
                 $this->stopProcess($server);
             }
             if (is_dir($tmpRoot)) {
@@ -156,13 +157,13 @@ final class ComposerReinstallRuntimeSwitchTest extends TestCase
 
     private function createZipArtifact(string $zipPath, string $runtime): void
     {
-        $zip = new ZipArchive();
-        $ok = $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        $zip = new \ZipArchive();
+        $ok = $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
         if (true !== $ok) {
-            throw new RuntimeException("Unable to create archive: {$zipPath}");
+            throw new \RuntimeException("Unable to create archive: {$zipPath}");
         }
 
-        $zip->addFromString('runtime-marker.txt', $runtime.PHP_EOL);
+        $zip->addFromString('runtime-marker.txt', $runtime.\PHP_EOL);
         $zip->addFromString('README.txt', 'onnxruntime integration artifact');
         $zip->close();
     }
@@ -171,14 +172,14 @@ final class ComposerReinstallRuntimeSwitchTest extends TestCase
     {
         $socket = stream_socket_server('tcp://127.0.0.1:0', $errno, $error);
         if (false === $socket) {
-            throw new RuntimeException("Unable to reserve a free port: {$error}");
+            throw new \RuntimeException("Unable to reserve a free port: {$error}");
         }
 
         $name = stream_socket_get_name($socket, false);
         fclose($socket);
 
-        if (!is_string($name) || !str_contains($name, ':')) {
-            throw new RuntimeException('Unable to read reserved port.');
+        if (!\is_string($name) || !str_contains($name, ':')) {
+            throw new \RuntimeException('Unable to read reserved port.');
         }
 
         return (int) substr($name, strrpos($name, ':') + 1);
@@ -189,9 +190,9 @@ final class ComposerReinstallRuntimeSwitchTest extends TestCase
      */
     private function startPhpServer(string $documentRoot, int $port): array
     {
-        $cmd = sprintf(
+        $cmd = \sprintf(
             '%s -S %s -t %s',
-            escapeshellarg(PHP_BINARY),
+            escapeshellarg(\PHP_BINARY),
             escapeshellarg("127.0.0.1:{$port}"),
             escapeshellarg($documentRoot)
         );
@@ -203,8 +204,8 @@ final class ComposerReinstallRuntimeSwitchTest extends TestCase
         ];
 
         $process = proc_open($cmd, $descriptorSpec, $pipes);
-        if (!is_resource($process)) {
-            throw new RuntimeException('Unable to start local PHP server.');
+        if (!\is_resource($process)) {
+            throw new \RuntimeException('Unable to start local PHP server.');
         }
 
         fclose($pipes[0]);
@@ -223,16 +224,16 @@ final class ComposerReinstallRuntimeSwitchTest extends TestCase
         for ($i = 0; $i < 20; ++$i) {
             usleep(100_000);
             $headers = @get_headers($url);
-            if (is_array($headers) && isset($headers[0]) && str_contains($headers[0], '200')) {
+            if (\is_array($headers) && isset($headers[0]) && str_contains($headers[0], '200')) {
                 return;
             }
         }
 
-        throw new RuntimeException("Local artifact server did not become ready for URL: {$url}");
+        throw new \RuntimeException("Local artifact server did not become ready for URL: {$url}");
     }
 
     /**
-     * @param array<int, string> $command
+     * @param array<int, string>    $command
      * @param array<string, string> $env
      *
      * @return array{exit_code: int, stdout: string, stderr: string}
@@ -247,8 +248,8 @@ final class ComposerReinstallRuntimeSwitchTest extends TestCase
         ];
 
         $process = proc_open($cmd, $descriptorSpec, $pipes, $cwd, array_merge($_ENV, $env));
-        if (!is_resource($process)) {
-            throw new RuntimeException("Unable to run command: {$cmd}");
+        if (!\is_resource($process)) {
+            throw new \RuntimeException("Unable to run command: {$cmd}");
         }
 
         fclose($pipes[0]);
@@ -259,12 +260,14 @@ final class ComposerReinstallRuntimeSwitchTest extends TestCase
             $status = proc_get_status($process);
             if (false === $status['running']) {
                 $finalStatus = $status;
+
                 break;
             }
 
             if ((time() - $start) > $timeoutSeconds) {
                 proc_terminate($process);
-                throw new RuntimeException("Command timed out after {$timeoutSeconds}s: {$cmd}");
+
+                throw new \RuntimeException("Command timed out after {$timeoutSeconds}s: {$cmd}");
             }
 
             usleep(100_000);
@@ -276,7 +279,7 @@ final class ComposerReinstallRuntimeSwitchTest extends TestCase
         fclose($pipes[2]);
 
         $exitCode = proc_close($process);
-        if (-1 === $exitCode && is_array($finalStatus) && isset($finalStatus['exitcode']) && is_int($finalStatus['exitcode'])) {
+        if (-1 === $exitCode && \is_array($finalStatus) && isset($finalStatus['exitcode']) && \is_int($finalStatus['exitcode'])) {
             $exitCode = $finalStatus['exitcode'];
         }
 
@@ -292,13 +295,13 @@ final class ComposerReinstallRuntimeSwitchTest extends TestCase
      */
     private function stopProcess(array $processData): void
     {
-        if (is_resource($processData['stdout'])) {
+        if (\is_resource($processData['stdout'])) {
             fclose($processData['stdout']);
         }
-        if (is_resource($processData['stderr'])) {
+        if (\is_resource($processData['stderr'])) {
             fclose($processData['stderr']);
         }
-        if (is_resource($processData['process'])) {
+        if (\is_resource($processData['process'])) {
             proc_terminate($processData['process']);
             proc_close($processData['process']);
         }
@@ -316,7 +319,7 @@ final class ComposerReinstallRuntimeSwitchTest extends TestCase
             return $whichComposer;
         }
 
-        throw new RuntimeException('Composer binary not found. Ensure vendor/bin/composer or global composer is available.');
+        throw new \RuntimeException('Composer binary not found. Ensure vendor/bin/composer or global composer is available.');
     }
 
     /**
@@ -326,24 +329,25 @@ final class ComposerReinstallRuntimeSwitchTest extends TestCase
     {
         mkdir($targetRoot, 0777, true);
 
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($sourceRoot, FilesystemIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::SELF_FIRST
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($sourceRoot, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::SELF_FIRST
         );
 
         foreach ($iterator as $item) {
-            $relative = substr($item->getPathname(), strlen($sourceRoot) + 1);
-            $firstPart = explode(DIRECTORY_SEPARATOR, $relative)[0];
+            $relative = substr($item->getPathname(), \strlen($sourceRoot) + 1);
+            $firstPart = explode(\DIRECTORY_SEPARATOR, $relative)[0];
 
-            if (in_array($firstPart, $skipTopLevel, true)) {
+            if (\in_array($firstPart, $skipTopLevel, true)) {
                 continue;
             }
 
-            $dest = $targetRoot.DIRECTORY_SEPARATOR.$relative;
+            $dest = $targetRoot.\DIRECTORY_SEPARATOR.$relative;
             if ($item->isDir()) {
                 if (!is_dir($dest)) {
                     mkdir($dest, 0777, true);
                 }
+
                 continue;
             }
 
@@ -364,19 +368,20 @@ final class ComposerReinstallRuntimeSwitchTest extends TestCase
         ];
         unset($composer['require-dev']);
 
-        file_put_contents($composerPath, json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        file_put_contents($composerPath, json_encode($composer, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES));
     }
 
     private function removeDirectoryRecursive(string $path): void
     {
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CHILD_FIRST
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST
         );
 
         foreach ($iterator as $item) {
             if ($item->isDir()) {
                 rmdir($item->getPathname());
+
                 continue;
             }
             unlink($item->getPathname());
@@ -385,4 +390,3 @@ final class ComposerReinstallRuntimeSwitchTest extends TestCase
         rmdir($path);
     }
 }
-

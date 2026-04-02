@@ -211,8 +211,6 @@ final class OrtValue
     /**
      * Create tensor from NDArray.
      *
-     * @param NDArray $ndarray
-     *
      * @throws InvalidArgumentException If NDArray package is not installed
      */
     public static function fromNDArray(NDArray $ndarray): self
@@ -329,9 +327,7 @@ final class OrtValue
     /**
      * Convert tensor OrtValue to NDArray.
      *
-     * @return NDArray
-     *
-     * @throws InvalidArgumentException If NDArray package is not installed
+     * @throws InvalidArgumentException  If NDArray package is not installed
      * @throws InvalidOperationException If value is not a supported tensor
      */
     public function toNDArray(): NDArray
