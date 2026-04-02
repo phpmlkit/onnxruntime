@@ -771,30 +771,19 @@ If you have the `phpmlkit/ndarray` package installed:
 ```php
 use PhpMlKit\NDArray\NDArray;
 use PhpMlKit\NDArray\DType;
+use PhpMlKit\ONNXRuntime\OrtValue;
 
 // Create NDArray
 $ndarray = NDArray::array([[1, 2], [3, 4]], DType::Float32);
 
-// Convert to OrtValue
-$bufferSize = $ndarray->nbytes();
-$buffer = FFI::cdef()->new("uint8_t[{$bufferSize}]");
-$ndarray->intoBuffer($buffer);
+// Convert to OrtValue (zero-copy friendly helper)
+$tensor = OrtValue::fromNDArray($ndarray);
 
-$tensor = OrtValue::fromBuffer(
-    $buffer,
-    $bufferSize,
-    DataType::FLOAT,
-    $ndarray->shape()
-);
+// Run inference
+$outputs = $session->run(['input' => $tensor]);
 
-// Convert back
-$outputTensor = $outputs['output'];
-$data = $outputTensor->tensorRawData();
-$outputNDArray = NDArray::fromBuffer(
-    $data,
-    $outputTensor->shape(),
-    DType::Float32
-);
+// Convert OrtValue output back to NDArray
+$outputNDArray = $outputs['output']->toNDArray();
 ```
 
 ### Profiling

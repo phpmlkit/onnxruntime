@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpMlKit\ONNXRuntime;
 
 use FFI\CData;
+use PhpMlKit\NDArray\NDArray;
 use PhpMlKit\ONNXRuntime\Enums\AllocatorType;
 use PhpMlKit\ONNXRuntime\Enums\DataType;
 use PhpMlKit\ONNXRuntime\Enums\MemoryType;
@@ -208,6 +209,29 @@ final class OrtValue
     }
 
     /**
+     * Create tensor from NDArray.
+     *
+     * @param NDArray $ndarray
+     *
+     * @throws InvalidArgumentException If NDArray package is not installed
+     */
+    public static function fromNDArray(NDArray $ndarray): self
+    {
+        if (!class_exists(NDArray::class)) {
+            throw new InvalidArgumentException('NDArray support requires phpmlkit/ndarray. Install the package to use fromNDArray().');
+        }
+
+        $shape = $ndarray->shape();
+        $dataType = DataType::fromDtype($ndarray->dtype());
+        $bufferSize = $ndarray->nbytes();
+
+        $buffer = Lib::get()->new("uint8_t[{$bufferSize}]");
+        $ndarray->intoBuffer($buffer);
+
+        return self::fromBuffer($buffer, $bufferSize, $dataType, $shape);
+    }
+
+    /**
      * Create from native handle.
      *
      * This is used internally when receiving values from the API.
@@ -300,6 +324,35 @@ final class OrtValue
                 "Cannot convert {$this->type->getName()} to array"
             ),
         };
+    }
+
+    /**
+     * Convert tensor OrtValue to NDArray.
+     *
+     * @return NDArray
+     *
+     * @throws InvalidArgumentException If NDArray package is not installed
+     * @throws InvalidOperationException If value is not a supported tensor
+     */
+    public function toNDArray(): NDArray
+    {
+        if (!class_exists(NDArray::class)) {
+            throw new InvalidArgumentException('NDArray support requires phpmlkit/ndarray. Install the package to use toNDArray().');
+        }
+
+        if (!$this->isTensor()) {
+            throw new InvalidOperationException('Cannot convert non-tensor OrtValue to NDArray');
+        }
+
+        if (DataType::STRING === $this->dataType) {
+            throw new InvalidOperationException('Cannot convert string tensor to NDArray');
+        }
+
+        $dtype = $this->dataType->toDtype();
+        $shape = $this->shape();
+        $data = $this->tensorRawData();
+
+        return NDArray::fromBuffer($data, $shape, $dtype);
     }
 
     /**
