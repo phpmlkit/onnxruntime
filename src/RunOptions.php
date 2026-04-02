@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpMlKit\ONNXRuntime;
 
 use FFI\CData;
+use PhpMlKit\ONNXRuntime\Contracts\Disposable;
 use PhpMlKit\ONNXRuntime\Enums\LoggingLevel;
 use PhpMlKit\ONNXRuntime\FFI\Lib;
 
@@ -17,7 +18,7 @@ use PhpMlKit\ONNXRuntime\FFI\Lib;
  * Run options allow per-inference configuration that overrides session defaults,
  * such as custom logging levels, run tags for profiling, and termination control.
  */
-final class RunOptions
+final class RunOptions implements Disposable
 {
     /** @var null|CData Lazy-initialized ONNX Runtime run options handle */
     private ?CData $handle = null;
@@ -37,7 +38,7 @@ final class RunOptions
 
     public function __destruct()
     {
-        $this->release();
+        $this->dispose();
     }
 
     /**
@@ -61,7 +62,7 @@ final class RunOptions
      *
      * Safe to call multiple times. Called automatically on destruction.
      */
-    public function release(): void
+    public function dispose(): void
     {
         if (null !== $this->handle) {
             Lib::api()->releaseRunOptions($this->handle);

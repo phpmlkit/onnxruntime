@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpMlKit\ONNXRuntime;
 
 use FFI\CData;
+use PhpMlKit\ONNXRuntime\Contracts\Disposable;
 use PhpMlKit\ONNXRuntime\Enums\ExecutionMode;
 use PhpMlKit\ONNXRuntime\Enums\ExecutionProvider;
 use PhpMlKit\ONNXRuntime\Enums\GraphOptimizationLevel;
@@ -19,7 +20,7 @@ use PhpMlKit\ONNXRuntime\Providers\TensorRTProviderOptions;
 /**
  * Session configuration options for InferenceSession.
  */
-final class SessionOptions
+final class SessionOptions implements Disposable
 {
     /** @var null|CData Lazy-initialized ONNX Runtime session options handle */
     private ?CData $handle = null;
@@ -61,7 +62,7 @@ final class SessionOptions
 
     public function __destruct()
     {
-        $this->release();
+        $this->dispose();
     }
 
     /**
@@ -85,7 +86,7 @@ final class SessionOptions
      *
      * Safe to call multiple times. Called automatically on destruction.
      */
-    public function release(): void
+    public function dispose(): void
     {
         if (null !== $this->handle) {
             Lib::api()->releaseSessionOptions($this->handle);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpMlKit\ONNXRuntime;
 
 use FFI\CData;
+use PhpMlKit\ONNXRuntime\Contracts\Disposable;
 use PhpMlKit\ONNXRuntime\Enums\AllocatorType;
 use PhpMlKit\ONNXRuntime\Enums\DataType;
 use PhpMlKit\ONNXRuntime\Enums\LoggingLevel;
@@ -31,7 +32,7 @@ use PhpMlKit\ONNXRuntime\FFI\Lib;
  * // Convert output to PHP array
  * $result = $outputs['output']->toArray();
  */
-class InferenceSession
+class InferenceSession implements Disposable
 {
     private static ?CData $env = null;
     private static int $envRefCount = 0;
@@ -40,7 +41,7 @@ class InferenceSession
     private CData $memoryInfo;
     private array $inputMetadata = [];
     private array $outputMetadata = [];
-    private bool $closed = false;
+    private bool $disposed = false;
 
     /**
      * Private constructor. Use factory methods.
@@ -58,7 +59,7 @@ class InferenceSession
 
     public function __destruct()
     {
-        $this->close();
+        $this->dispose();
     }
 
     /**
@@ -160,9 +161,9 @@ class InferenceSession
     /**
      * Close the session and release resources.
      */
-    public function close(): void
+    public function dispose(): void
     {
-        if ($this->closed) {
+        if ($this->disposed) {
             return;
         }
 
@@ -182,7 +183,7 @@ class InferenceSession
             self::$env = null;
         }
 
-        $this->closed = true;
+        $this->disposed = true;
     }
 
     /**
@@ -390,12 +391,12 @@ class InferenceSession
     /**
      * Ensure session is open.
      *
-     * @throws InvalidOperationException If session is closed
+     * @throws InvalidOperationException If session is disposed
      */
     private function ensureOpen(): void
     {
-        if ($this->closed) {
-            throw new InvalidOperationException('Inference session has been closed');
+        if ($this->disposed) {
+            throw new InvalidOperationException('Inference session has been disposed');
         }
     }
 

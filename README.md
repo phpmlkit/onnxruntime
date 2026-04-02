@@ -176,7 +176,7 @@ $result = $outputs['output']->toArray();
 print_r($result);
 
 // 5. Clean up (optional - happens automatically)
-$session->close();
+$session->dispose();
 ```
 
 ## Where to Get Models
@@ -310,7 +310,7 @@ Sessions automatically clean up when they go out of scope, but you can explicitl
 ```php
 $session = InferenceSession::fromFile('model.onnx');
 // ... use session ...
-$session->close();  // Explicit cleanup
+$session->dispose();  // Explicit cleanup
 
 // Or let PHP handle it automatically when $session goes out of scope
 ```
@@ -628,7 +628,7 @@ For deterministic resource management, use explicit cleanup methods:
 // Sessions
 $session = InferenceSession::fromFile('model.onnx');
 // ... use session ...
-$session->close();  // Release session resources
+$session->dispose();  // Release session resources
 
 // OrtValues
 $tensor = OrtValue::fromArray([1, 2, 3], DataType::FLOAT);
@@ -689,8 +689,8 @@ $session1 = InferenceSession::fromFile('model1.onnx');
 $session2 = InferenceSession::fromFile('model2.onnx');
 // Both share the same environment
 
-$session1->close();  // Environment kept alive by session2
-$session2->close();  // Environment released (no more sessions)
+$session1->dispose();  // Environment kept alive by session2
+$session2->dispose();  // Environment released (no more sessions)
 ```
 
 This is handled automatically - you don't need to manage it.
@@ -803,7 +803,7 @@ for ($i = 0; $i < 100; $i++) {
     $session->run($inputs);
 }
 
-$session->close();  // Profile saved to my_model_profile_*.json
+$session->dispose();  // Profile saved to my_model_profile_*.json
 ```
 
 ### Execution Provider Support

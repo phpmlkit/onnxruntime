@@ -6,6 +6,7 @@ namespace PhpMlKit\ONNXRuntime;
 
 use FFI\CData;
 use PhpMlKit\NDArray\NDArray;
+use PhpMlKit\ONNXRuntime\Contracts\Disposable;
 use PhpMlKit\ONNXRuntime\Enums\AllocatorType;
 use PhpMlKit\ONNXRuntime\Enums\DataType;
 use PhpMlKit\ONNXRuntime\Enums\MemoryType;
@@ -25,7 +26,7 @@ use PhpMlKit\ONNXRuntime\FFI\Lib;
  * - Opaque types
  * - Optional types
  */
-final class OrtValue
+final class OrtValue implements Disposable
 {
     private bool $disposed = false;
 
