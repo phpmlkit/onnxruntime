@@ -1,0 +1,142 @@
+name: Release
+
+on:
+  release:
+    types: [created, published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'ONNX Runtime version to package'
+        required: false
+        default: '1.24.3'
+        type: string
+
+env:
+  ONNXRUNTIME_VERSION: ${{ github.event.inputs.version || '1.24.3' }}
+
+jobs:
+  build:
+    name: Build for ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86_64 - CPU
+          - name: Linux x86_64 - CPU
+            platform: linux-x86_64
+            runner: ubuntu-latest
+            runtime: cpu
+            archive_ext: tar.gz
+          # Linux x86_64 - CUDA 12
+          - name: Linux x86_64 - CUDA 12
+            platform: linux-x86_64
+            runner: ubuntu-latest
+            runtime: cuda12
+            archive_ext: tar.gz
+          # Linux x86_64 - CUDA 13
+          - name: Linux x86_64 - CUDA 13
+            platform: linux-x86_64
+            runner: ubuntu-latest
+            runtime: cuda13
+            archive_ext: tar.gz
+          # Linux ARM64 - CPU
+          - name: Linux ARM64 - CPU
+            platform: linux-arm64
+            runner: ubuntu-24.04-arm
+            runtime: cpu
+            archive_ext: tar.gz
+          # macOS ARM64 - CPU
+          - name: macOS ARM64 - CPU
+            platform: darwin-arm64
+            runner: macos-latest
+            runtime: cpu
+            archive_ext: tar.gz
+          # Windows x64 - CPU
+          - name: Windows x64 - CPU
+            platform: windows-x64
+            runner: windows-latest
+            runtime: cpu
+            archive_ext: zip
+          # Windows x64 - CUDA 12
+          - name: Windows x64 - CUDA 12
+            platform: windows-x64
+            runner: windows-latest
+            runtime: cuda12
+            archive_ext: zip
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download ONNX Runtime binaries
+        shell: bash
+        run: |
+          echo "Downloading ONNX Runtime ${{ env.ONNXRUNTIME_VERSION }} for ${{ matrix.platform }} (${{ matrix.runtime }})"
+          bash scripts/download-onnxruntime --platform ${{ matrix.platform }} --runtime ${{ matrix.runtime }} --version ${{ env.ONNXRUNTIME_VERSION }}
+
+      - name: Create distribution package (Unix)
+        if: matrix.archive_ext == 'tar.gz'
+        shell: bash
+        run: |
+          DIST_NAME="dist-${{ matrix.platform }}-${{ matrix.runtime }}"
+          mkdir -p "${DIST_NAME}"
+          
+          # Copy essential files
+          cp -r src "${DIST_NAME}/"
+          cp -r include "${DIST_NAME}/"
+          cp -r scripts "${DIST_NAME}/"
+          cp composer.json "${DIST_NAME}/"
+          cp LICENSE "${DIST_NAME}/"
+          cp README.md "${DIST_NAME}/" 2>/dev/null || true
+          cp CHANGELOG.md "${DIST_NAME}/" 2>/dev/null || true
+          
+          # Copy downloaded library
+          cp -r lib "${DIST_NAME}/"
+          
+          # Create tarball
+          tar -czf "${DIST_NAME}.tar.gz" "${DIST_NAME}"
+          
+          echo "Created ${DIST_NAME}.tar.gz"
+          ls -lh "${DIST_NAME}.tar.gz"
+
+      - name: Create distribution package (Windows)
+        if: matrix.archive_ext == 'zip'
+        shell: pwsh
+        run: |
+          $distName = "dist-${{ matrix.platform }}-${{ matrix.runtime }}"
+          New-Item -ItemType Directory -Name $distName -Force
+          
+          # Copy essential files
+          Copy-Item -Path src -Destination $distName -Recurse -Force
+          Copy-Item -Path include -Destination $distName -Recurse -Force
+          Copy-Item -Path scripts -Destination $distName -Recurse -Force
+          Copy-Item -Path composer.json -Destination $distName -Force
+          Copy-Item -Path LICENSE -Destination $distName -Force
+          if (Test-Path README.md) { Copy-Item -Path README.md -Destination $distName -Force }
+          if (Test-Path CHANGELOG.md) { Copy-Item -Path CHANGELOG.md -Destination $distName -Force }
+          
+          # Copy downloaded library
+          Copy-Item -Path lib -Destination $distName -Recurse -Force
+          
+          # Create zip
+          Compress-Archive -Path $distName -DestinationPath "${distName}.zip" -Force
+          
+          Write-Host "Created ${distName}.zip"
+          Get-ChildItem "${distName}.zip"
+
+      - name: Upload to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-${{ matrix.platform }}-${{ matrix.runtime }}.${{ matrix.archive_ext }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to Artifacts (workflow dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.platform }}-${{ matrix.runtime }}
+          path: dist-${{ matrix.platform }}-${{ matrix.runtime }}.${{ matrix.archive_ext }}
+          retention-days: 7
