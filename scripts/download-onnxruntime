@@ -203,6 +203,34 @@ get_download_info() {
     echo "$filename|$lib_name|$url"
 }
 
+# Merge upstream ThirdPartyNotices.txt + LICENSE into lib/ThirdPartyNotices.txt
+generate_third_party_notice() {
+    local extracted_dir="$1"
+    local out_file="${LIB_DIR}/ThirdPartyNotices.txt"
+    local tp="${extracted_dir}/ThirdPartyNotices.txt"
+    local lic="${extracted_dir}/LICENSE"
+
+    mkdir -p "$LIB_DIR"
+    [ -f "$tp" ] || [ -f "$lic" ] || return 0
+
+    {
+        if [ -f "$tp" ]; then
+            echo "=== ONNX Runtime Third Party Notices ==="
+            echo ""
+            cat "$tp"
+        fi
+        if [ -f "$tp" ] && [ -f "$lic" ]; then
+            echo ""
+            echo ""
+        fi
+        if [ -f "$lic" ]; then
+            echo "=== ONNX Runtime License ==="
+            echo ""
+            cat "$lic"
+        fi
+    } > "$out_file"
+}
+
 # Download and extract library
 download_library() {
     local platform=$1
@@ -266,11 +294,13 @@ download_library() {
         tar -xzf "$download_path" -C "$temp_dir"
         local extracted_dir=$(find "$temp_dir" -maxdepth 1 -type d -name "onnxruntime-*" | head -1)
         cp "${extracted_dir}/lib/${lib_name}" "$platform_lib_dir/"
+        generate_third_party_notice "$extracted_dir"
     elif [[ "$filename" == *.zip ]]; then
         if command -v unzip &> /dev/null; then
             unzip -q "$download_path" -d "$temp_dir"
             local extracted_dir=$(find "$temp_dir" -maxdepth 1 -type d -name "onnxruntime-*" | head -1)
             cp "${extracted_dir}/lib/${lib_name}" "$platform_lib_dir/"
+            generate_third_party_notice "$extracted_dir"
         else
             log_error "unzip is required to extract Windows libraries"
             exit 1

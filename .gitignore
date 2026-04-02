@@ -8,6 +8,7 @@
 # Platform-specific libraries (downloaded at install time)
 /lib/*/
 !/lib/.gitkeep
+/lib/ThirdPartyNotices.txt
 
 # IDE
 /.idea/
