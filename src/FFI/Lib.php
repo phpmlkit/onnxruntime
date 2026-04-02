@@ -44,7 +44,7 @@ final class Lib
     private static ?\FFI $ffi = null;
     private static ?Api $api = null;
     private static ?string $libraryPath = null;
-    private static $libc;
+    private static $msvcrt;
 
     /**
      * Get FFI instance (singleton).
@@ -109,16 +109,16 @@ final class Lib
     }
 
     // for Windows
-    public static function libc()
+    public static function msvcrt()
     {
-        if (!isset(self::$libc)) {
-            self::$libc = \FFI::cdef(
+        if (!isset(self::$msvcrt)) {
+            self::$msvcrt = \FFI::cdef(
                 'size_t mbstowcs(void *wcstr, const char *mbstr, size_t count);',
                 'msvcrt.dll'
             );
         }
 
-        return self::$libc;
+        return self::$msvcrt;
     }
 
     /**
@@ -134,12 +134,12 @@ final class Lib
             return $value;
         }
 
-        $libc = self::libc();
+        $msvcrt = self::msvcrt();
         $strlen = \strlen($value);
         $maxChars = $strlen + 1;
 
-        $dest = $libc->new('char['.($maxChars * 2).']');
-        $ret = (int) $libc->mbstowcs($dest, $value, $maxChars);
+        $dest = $msvcrt->new('char['.($maxChars * 2).']');
+        $ret = (int) $msvcrt->mbstowcs($dest, $value, $maxChars);
 
         if ($ret != $strlen) {
             throw new \RuntimeException('Expected mbstowcs to return '.$strlen.", got {$ret}");

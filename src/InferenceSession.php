@@ -8,7 +8,6 @@ use FFI\CData;
 use PhpMlKit\ONNXRuntime\Contracts\Disposable;
 use PhpMlKit\ONNXRuntime\Enums\AllocatorType;
 use PhpMlKit\ONNXRuntime\Enums\DataType;
-use PhpMlKit\ONNXRuntime\Enums\LoggingLevel;
 use PhpMlKit\ONNXRuntime\Enums\MemoryType;
 use PhpMlKit\ONNXRuntime\Exceptions\InvalidArgumentException;
 use PhpMlKit\ONNXRuntime\Exceptions\InvalidOperationException;
@@ -34,10 +33,6 @@ use PhpMlKit\ONNXRuntime\FFI\Lib;
  */
 class InferenceSession implements Disposable
 {
-    private static ?CData $env = null;
-    private static int $envRefCount = 0;
-
-    private CData $session;
     private CData $memoryInfo;
     private array $inputMetadata = [];
     private array $outputMetadata = [];
@@ -46,12 +41,11 @@ class InferenceSession implements Disposable
     /**
      * Private constructor. Use factory methods.
      *
-     * @param CData $session ONNX Runtime session handle
+     * @param Environment $environment The environment managing this session
      */
-    private function __construct(CData $session)
+    private function __construct(private CData $handle, private Environment $environment)
     {
         $api = Lib::api();
-        $this->session = $session;
         $this->memoryInfo = $api->createCpuMemoryInfo(AllocatorType::ARENA_ALLOCATOR, MemoryType::DEFAULT);
 
         $this->cacheMetadata();
@@ -75,13 +69,12 @@ class InferenceSession implements Disposable
     {
         $api = Lib::api();
 
-        $env = self::env();
-        ++self::$envRefCount;
+        $environment = Environment::acquire();
 
         $options ??= SessionOptions::default();
-        $session = $api->createSession($env, $path, $options);
+        $handle = $api->createSession($environment->getHandle(), $path, $options);
 
-        return new self($session);
+        return new self($handle, $environment);
     }
 
     /**
@@ -96,13 +89,12 @@ class InferenceSession implements Disposable
     {
         $api = Lib::api();
 
-        $env = self::env();
-        ++self::$envRefCount;
+        $environment = Environment::acquire();
 
         $options ??= SessionOptions::default();
-        $session = $api->createSessionFromArray($env, $bytes, $options);
+        $handle = $api->createSessionFromArray($environment->getHandle(), $bytes, $options);
 
-        return new self($session);
+        return new self($handle, $environment);
     }
 
     /**
@@ -128,7 +120,7 @@ class InferenceSession implements Disposable
         $inputValues = $this->prepareInputs($inputs, $inputNames);
         $options ??= RunOptions::default();
 
-        $outputValues = $api->run($this->session, $options, $inputNames, $inputValues, $outputNames);
+        $outputValues = $api->run($this->handle, $options, $inputNames, $inputValues, $outputNames);
 
         $result = [];
         foreach ($outputNames as $i => $name) {
@@ -159,7 +151,11 @@ class InferenceSession implements Disposable
     }
 
     /**
-     * Close the session and release resources.
+     * Dispose the session and release resources.
+     *
+     * Releases the session and memory info, and decrements the environment
+     * reference count. When the last session using the environment is disposed,
+     * the environment itself is freed.
      */
     public function dispose(): void
     {
@@ -169,19 +165,11 @@ class InferenceSession implements Disposable
 
         $api = Lib::api();
 
-        if (isset($this->session)) {
-            $api->releaseSession($this->session);
-        }
+        $api->releaseSession($this->handle);
 
-        if (isset($this->memoryInfo)) {
-            $api->releaseMemoryInfo($this->memoryInfo);
-        }
+        $api->releaseMemoryInfo($this->memoryInfo);
 
-        --self::$envRefCount;
-        if (0 === self::$envRefCount && null !== self::$env) {
-            $api->releaseEnv(self::$env);
-            self::$env = null;
-        }
+        $this->environment->dispose();
 
         $this->disposed = true;
     }
@@ -245,10 +233,10 @@ class InferenceSession implements Disposable
     {
         $api = Lib::api();
 
-        $inputCount = $api->sessionGetInputCount($this->session);
+        $inputCount = $api->sessionGetInputCount($this->handle);
 
         for ($i = 0; $i < $inputCount; ++$i) {
-            $typeInfo = $api->sessionGetInputTypeInfo($this->session, $i);
+            $typeInfo = $api->sessionGetInputTypeInfo($this->handle, $i);
 
             try {
                 $name = $this->getInputName($i);
@@ -262,10 +250,10 @@ class InferenceSession implements Disposable
             }
         }
 
-        $outputCount = $api->sessionGetOutputCount($this->session);
+        $outputCount = $api->sessionGetOutputCount($this->handle);
 
         for ($i = 0; $i < $outputCount; ++$i) {
-            $typeInfo = $api->sessionGetOutputTypeInfo($this->session, $i);
+            $typeInfo = $api->sessionGetOutputTypeInfo($this->handle, $i);
 
             try {
                 $name = $this->getOutputName($i);
@@ -292,7 +280,7 @@ class InferenceSession implements Disposable
         $api = Lib::api();
         $allocator = $api->getAllocatorWithDefaultOptions();
 
-        return $api->sessionGetInputName($this->session, $index, $allocator);
+        return $api->sessionGetInputName($this->handle, $index, $allocator);
     }
 
     /**
@@ -331,7 +319,7 @@ class InferenceSession implements Disposable
         $api = Lib::api();
         $allocator = $api->getAllocatorWithDefaultOptions();
 
-        return $api->sessionGetOutputName($this->session, $index, $allocator);
+        return $api->sessionGetOutputName($this->handle, $index, $allocator);
     }
 
     /**
@@ -398,23 +386,5 @@ class InferenceSession implements Disposable
         if ($this->disposed) {
             throw new InvalidOperationException('Inference session has been disposed');
         }
-    }
-
-    /**
-     * Get environment.
-     *
-     * @return CData Environment
-     */
-    private static function env(): CData
-    {
-        if (null === self::$env) {
-            $api = Lib::api();
-            self::$env = $api->createEnv(LoggingLevel::FATAL, 'onnxruntime');
-
-            // https://github.com/microsoft/onnxruntime/blob/main/docs/Privacy.md
-            $api->disableTelemetryEvents(self::$env);
-        }
-
-        return self::$env;
     }
 }
