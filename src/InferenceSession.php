@@ -8,7 +8,6 @@ use FFI\CData;
 use PhpMlKit\NDArray\NDArray;
 use PhpMlKit\ONNXRuntime\Contracts\Disposable;
 use PhpMlKit\ONNXRuntime\Enums\AllocatorType;
-use PhpMlKit\ONNXRuntime\Enums\DataType;
 use PhpMlKit\ONNXRuntime\Enums\MemoryType;
 use PhpMlKit\ONNXRuntime\Enums\OnnxType;
 use PhpMlKit\ONNXRuntime\Exceptions\InvalidArgumentException;
@@ -159,6 +158,26 @@ class InferenceSession implements Disposable
     public function outputs(): array
     {
         return $this->outputMetadata;
+    }
+
+    /**
+     * Get input names.
+     *
+     * @return array<string>
+     */
+    public function inputNames(): array
+    {
+        return array_keys($this->inputMetadata);
+    }
+
+    /**
+     * Get output names.
+     *
+     * @return array<string>
+     */
+    public function outputNames(): array
+    {
+        return array_keys($this->outputMetadata);
     }
 
     /**

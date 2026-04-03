@@ -1,9 +1,6 @@
 #!/bin/bash
 set -e
 
-# ONNX Runtime PHP - Library Download Script
-# Downloads prebuilt ONNX Runtime binaries for the current platform
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 LIB_DIR="${PROJECT_ROOT}/lib"
@@ -11,13 +8,12 @@ RUNTIME="cpu"
 PLATFORM=""
 VERSION=$(cat "${PROJECT_ROOT}/ONNXRUNTIME_VERSION")
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 print_heading() {
     echo -e "${GREEN}$1${NC}"
@@ -94,7 +90,6 @@ normalize_runtime() {
     esac
 }
 
-# Detect platform
 detect_platform() {
     local os
     local arch
@@ -136,7 +131,6 @@ detect_platform() {
     echo "${os}-${arch}"
 }
 
-# Get download URL and filename for platform
 get_download_info() {
     local platform=$1
     local runtime=$2
@@ -169,11 +163,11 @@ get_download_info() {
         case "$platform" in
             linux-x86_64)
                 filename="onnxruntime-linux-x64-gpu-${VERSION}.tgz"
-                lib_name="libonnxruntime.so.${VERSION}"
+                lib_name="libonnxruntime.so.${VERSION} libonnxruntime_providers_cuda.so libonnxruntime_providers_shared.so libonnxruntime_providers_tensorrt.so"
                 ;;
             windows-x64)
                 filename="onnxruntime-win-x64-gpu-${VERSION}.zip"
-                lib_name="onnxruntime.dll"
+                lib_name="onnxruntime.dll onnxruntime_providers_cuda.dll onnxruntime_providers_shared.dll onnxruntime_providers_tensorrt.dll"
                 ;;
             *)
                 log_error "Runtime '${runtime}' is not supported on platform '${platform}'"
@@ -185,11 +179,11 @@ get_download_info() {
         case "$platform" in
             linux-x86_64)
                 filename="onnxruntime-linux-x64-gpu_cuda13-${VERSION}.tgz"
-                lib_name="libonnxruntime.so.${VERSION}"
+                lib_name="libonnxruntime.so.${VERSION} libonnxruntime_providers_cuda.so libonnxruntime_providers_shared.so libonnxruntime_providers_tensorrt.so"
                 ;;
             windows-x64)
                 filename="onnxruntime-win-x64-gpu_cuda13-${VERSION}.zip"
-                lib_name="onnxruntime.dll"
+                lib_name="onnxruntime.dll onnxruntime_providers_cuda.dll onnxruntime_providers_shared.dll onnxruntime_providers_tensorrt.dll"
                 ;;
             *)
                 log_error "Unsupported platform for runtime '${runtime}': ${platform}"
@@ -203,7 +197,6 @@ get_download_info() {
     echo "$filename|$lib_name|$url"
 }
 
-# Merge upstream ThirdPartyNotices.txt + LICENSE into lib/ThirdPartyNotices.txt
 generate_third_party_notice() {
     local extracted_dir="$1"
     local out_file="${LIB_DIR}/ThirdPartyNotices.txt"
@@ -231,21 +224,22 @@ generate_third_party_notice() {
     } > "$out_file"
 }
 
-# Download and extract library
 download_library() {
     local platform=$1
     local info
     local filename
-    local lib_name
+    local lib_names
+    local first_lib
     local url
     local platform_dir
     
     info=$(get_download_info "$platform" "$RUNTIME")
     filename=$(echo "$info" | cut -d'|' -f1)
-    lib_name=$(echo "$info" | cut -d'|' -f2)
+    lib_names=$(echo "$info" | cut -d'|' -f2)
     url=$(echo "$info" | cut -d'|' -f3)
     
-    # Map platform to directory name
+    first_lib=$(echo "$lib_names" | awk '{print $1}')
+    
     case "$platform" in
         linux-x86_64|linux-arm64|darwin-arm64|windows-x64)
             platform_dir="$platform"
@@ -258,8 +252,7 @@ download_library() {
     
     local platform_lib_dir="${LIB_DIR}/${platform_dir}"
     
-    # Check if already exists
-    if [ -f "${platform_lib_dir}/${lib_name}" ]; then
+    if [ -f "${platform_lib_dir}/${first_lib}" ]; then
         print_detail "ONNX Runtime library already exists for ${platform}"
         return 0
     fi
@@ -270,11 +263,9 @@ download_library() {
     print_item "Version" "${VERSION}"
     print_detail "Asset: ${filename}"
     
-    # Create temp directory
     local temp_dir=$(mktemp -d)
     trap "rm -rf \"$temp_dir\"" EXIT
     
-    # Download
     local download_path="${temp_dir}/${filename}"
     if command -v curl &> /dev/null; then
         curl -L -o "$download_path" "$url"
@@ -287,19 +278,22 @@ download_library() {
     
     print_heading "Installing ONNX Runtime library"
     
-    # Extract
     mkdir -p "$platform_lib_dir"
     
     if [[ "$filename" == *.tgz ]] || [[ "$filename" == *.tar.gz ]]; then
         tar -xzf "$download_path" -C "$temp_dir"
         local extracted_dir=$(find "$temp_dir" -maxdepth 1 -type d -name "onnxruntime-*" | head -1)
-        cp "${extracted_dir}/lib/${lib_name}" "$platform_lib_dir/"
+        for lib in $lib_names; do
+            cp "${extracted_dir}/lib/${lib}" "$platform_lib_dir/"
+        done
         generate_third_party_notice "$extracted_dir"
     elif [[ "$filename" == *.zip ]]; then
         if command -v unzip &> /dev/null; then
             unzip -q "$download_path" -d "$temp_dir"
             local extracted_dir=$(find "$temp_dir" -maxdepth 1 -type d -name "onnxruntime-*" | head -1)
-            cp "${extracted_dir}/lib/${lib_name}" "$platform_lib_dir/"
+            for lib in $lib_names; do
+                cp "${extracted_dir}/lib/${lib}" "$platform_lib_dir/"
+            done
             generate_third_party_notice "$extracted_dir"
         else
             log_error "unzip is required to extract Windows libraries"
@@ -307,10 +301,9 @@ download_library() {
         fi
     fi
     
-    print_detail "Installed ${lib_name} to ${platform_lib_dir}"
+    print_detail "Installed libraries to ${platform_lib_dir}"
 }
 
-# Main
 main() {
     parse_args "$@"
     normalize_runtime
@@ -322,7 +315,6 @@ main() {
     print_item "Runtime" "${RUNTIME}"
     print_item "Platform" "${platform}"
     
-    # Create lib directory if it doesn't exist
     mkdir -p "$LIB_DIR"
     
     download_library "$platform"
