@@ -193,6 +193,20 @@ class Api
     }
 
     /**
+     * Set optimized model file path.
+     *
+     * @param CData  $options                OrtSessionOptions pointer
+     * @param string $optimizedModelFilepath Path to save the optimized model
+     *
+     * @throws Exception on error
+     */
+    public function setOptimizedModelFilepath(CData $options, string $optimizedModelFilepath): void
+    {
+        $status = ($this->api->SetOptimizedModelFilePath)($options, Lib::ortString($optimizedModelFilepath));
+        Lib::checkStatus($status);
+    }
+
+    /**
      * Enable profiling.
      *
      * @param CData  $options           OrtSessionOptions pointer

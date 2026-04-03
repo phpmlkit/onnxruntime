@@ -32,6 +32,7 @@ final class SessionOptions implements Disposable
      * @param null|int                    $intraOpNumThreads      Number of threads for intra-op parallelism
      * @param bool                        $enableCpuMemArena      Enable CPU memory arena
      * @param bool                        $enableMemPattern       Enable memory pattern optimization
+     * @param null|string                 $optimizedModelFilepath Path to save the optimized model
      * @param bool                        $enableProfiling        Enable profiling
      * @param null|string                 $profileFilePrefix      Profiling file prefix
      * @param null|LoggingLevel           $logSeverityLevel       Log severity level
@@ -45,6 +46,7 @@ final class SessionOptions implements Disposable
         public readonly ?int $intraOpNumThreads = null,
         public readonly bool $enableCpuMemArena = true,
         public readonly bool $enableMemPattern = true,
+        public readonly ?string $optimizedModelFilepath = null,
         public readonly bool $enableProfiling = false,
         public readonly ?string $profileFilePrefix = null,
         public readonly ?LoggingLevel $logSeverityLevel = null,
@@ -150,6 +152,7 @@ final class SessionOptions implements Disposable
             intraOpNumThreads: $this->intraOpNumThreads,
             enableCpuMemArena: $this->enableCpuMemArena,
             enableMemPattern: $this->enableMemPattern,
+            optimizedModelFilepath: $this->optimizedModelFilepath,
             enableProfiling: $this->enableProfiling,
             profileFilePrefix: $this->profileFilePrefix,
             logSeverityLevel: $this->logSeverityLevel,
@@ -167,6 +170,7 @@ final class SessionOptions implements Disposable
             intraOpNumThreads: $this->intraOpNumThreads,
             enableCpuMemArena: $this->enableCpuMemArena,
             enableMemPattern: $this->enableMemPattern,
+            optimizedModelFilepath: $this->optimizedModelFilepath,
             enableProfiling: $this->enableProfiling,
             profileFilePrefix: $this->profileFilePrefix,
             logSeverityLevel: $this->logSeverityLevel,
@@ -184,6 +188,7 @@ final class SessionOptions implements Disposable
             intraOpNumThreads: $this->intraOpNumThreads,
             enableCpuMemArena: $this->enableCpuMemArena,
             enableMemPattern: $this->enableMemPattern,
+            optimizedModelFilepath: $this->optimizedModelFilepath,
             enableProfiling: $this->enableProfiling,
             profileFilePrefix: $this->profileFilePrefix,
             logSeverityLevel: $this->logSeverityLevel,
@@ -201,6 +206,7 @@ final class SessionOptions implements Disposable
             intraOpNumThreads: $threads,
             enableCpuMemArena: $this->enableCpuMemArena,
             enableMemPattern: $this->enableMemPattern,
+            optimizedModelFilepath: $this->optimizedModelFilepath,
             enableProfiling: $this->enableProfiling,
             profileFilePrefix: $this->profileFilePrefix,
             logSeverityLevel: $this->logSeverityLevel,
@@ -218,6 +224,7 @@ final class SessionOptions implements Disposable
             intraOpNumThreads: $this->intraOpNumThreads,
             enableCpuMemArena: $enable,
             enableMemPattern: $this->enableMemPattern,
+            optimizedModelFilepath: $this->optimizedModelFilepath,
             enableProfiling: $this->enableProfiling,
             profileFilePrefix: $this->profileFilePrefix,
             logSeverityLevel: $this->logSeverityLevel,
@@ -235,6 +242,30 @@ final class SessionOptions implements Disposable
             intraOpNumThreads: $this->intraOpNumThreads,
             enableCpuMemArena: $this->enableCpuMemArena,
             enableMemPattern: $enable,
+            optimizedModelFilepath: $this->optimizedModelFilepath,
+            enableProfiling: $this->enableProfiling,
+            profileFilePrefix: $this->profileFilePrefix,
+            logSeverityLevel: $this->logSeverityLevel,
+            logVerbosityLevel: $this->logVerbosityLevel,
+            providers: $this->providers,
+        );
+    }
+
+    /**
+     * Set the optimized model filepath.
+     *
+     * @param string $filepath Path to save the optimized model
+     */
+    public function withOptimizedModelFilepath(string $filepath): self
+    {
+        return new self(
+            graphOptimizationLevel: $this->graphOptimizationLevel,
+            executionMode: $this->executionMode,
+            interOpNumThreads: $this->interOpNumThreads,
+            intraOpNumThreads: $this->intraOpNumThreads,
+            enableCpuMemArena: $this->enableCpuMemArena,
+            enableMemPattern: $this->enableMemPattern,
+            optimizedModelFilepath: $filepath,
             enableProfiling: $this->enableProfiling,
             profileFilePrefix: $this->profileFilePrefix,
             logSeverityLevel: $this->logSeverityLevel,
@@ -252,6 +283,7 @@ final class SessionOptions implements Disposable
             intraOpNumThreads: $this->intraOpNumThreads,
             enableCpuMemArena: $this->enableCpuMemArena,
             enableMemPattern: $this->enableMemPattern,
+            optimizedModelFilepath: $this->optimizedModelFilepath,
             enableProfiling: $enable,
             profileFilePrefix: $filePrefix ?? $this->profileFilePrefix,
             logSeverityLevel: $this->logSeverityLevel,
@@ -269,6 +301,7 @@ final class SessionOptions implements Disposable
             intraOpNumThreads: $this->intraOpNumThreads,
             enableCpuMemArena: $this->enableCpuMemArena,
             enableMemPattern: $this->enableMemPattern,
+            optimizedModelFilepath: $this->optimizedModelFilepath,
             enableProfiling: $this->enableProfiling,
             profileFilePrefix: $this->profileFilePrefix,
             logSeverityLevel: $severityLevel,
@@ -296,6 +329,7 @@ final class SessionOptions implements Disposable
             intraOpNumThreads: $this->intraOpNumThreads,
             enableCpuMemArena: $this->enableCpuMemArena,
             enableMemPattern: $this->enableMemPattern,
+            optimizedModelFilepath: $this->optimizedModelFilepath,
             enableProfiling: $this->enableProfiling,
             profileFilePrefix: $this->profileFilePrefix,
             logSeverityLevel: $this->logSeverityLevel,
@@ -363,6 +397,7 @@ final class SessionOptions implements Disposable
             intraOpNumThreads: $this->intraOpNumThreads,
             enableCpuMemArena: $this->enableCpuMemArena,
             enableMemPattern: $this->enableMemPattern,
+            optimizedModelFilepath: $this->optimizedModelFilepath,
             enableProfiling: $this->enableProfiling,
             profileFilePrefix: $this->profileFilePrefix,
             logSeverityLevel: $this->logSeverityLevel,
@@ -410,6 +445,10 @@ final class SessionOptions implements Disposable
             $api->enableMemPattern($handle);
         } else {
             $api->disableMemPattern($handle);
+        }
+
+        if (null !== $this->optimizedModelFilepath) {
+            $api->setOptimizedModelFilepath($handle, $this->optimizedModelFilepath);
         }
 
         if ($this->enableProfiling) {
