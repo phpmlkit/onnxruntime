@@ -275,6 +275,129 @@ def create_simple_neural_network(output_dir: str) -> None:
     print(f"Created: {output_path}")
 
 
+def create_image_transform_model(output_dir: str) -> None:
+    """Create an image transformation model with symbolic dimensions.
+    
+    Input shape: [batch_size, channels, height, width]
+    Output shape: [batch_size, channels, height, width]
+    
+    This model simply adds a learned bias to each channel.
+    """
+    
+    # Define input with symbolic dimensions
+    input_tensor = helper.make_tensor_value_info(
+        'image', 
+        TensorProto.FLOAT,
+        ['batch_size', 'num_channels', 'height', 'width']
+    )
+    
+    # Define output with same symbolic dimensions
+    output_tensor = helper.make_tensor_value_info(
+        'output',
+        TensorProto.FLOAT,
+        ['batch_size', 'num_channels', 'height', 'width']
+    )
+    
+    # Create a simple channel-wise bias addition
+    # We'll use a constant bias tensor and reshape it
+    bias = helper.make_tensor(
+        'bias',
+        TensorProto.FLOAT,
+        [3],  # 3 channels (RGB)
+        [0.1, 0.2, 0.3]  # Small bias for each channel
+    )
+    
+    # Create axes tensor for Unsqueeze (opset 13+ requires axes as input)
+    axes = helper.make_tensor(
+        'axes',
+        TensorProto.INT64,
+        [3],  # 3 axes to unsqueeze
+        [0, 2, 3]  # Add dimensions at positions 0, 2, 3
+    )
+    
+    # Use Unsqueeze with axes as input (opset 13+)
+    bias_reshaped = helper.make_node(
+        'Unsqueeze',
+        inputs=['bias', 'axes'],
+        outputs=['bias_4d'],
+        name='unsqueeze_bias'
+    )
+    
+    add_node = helper.make_node(
+        'Add',
+        inputs=['image', 'bias_4d'],
+        outputs=['output'],
+        name='add_bias'
+    )
+    
+    # Create graph
+    graph = helper.make_graph(
+        [bias_reshaped, add_node],
+        'image_transform_graph',
+        [input_tensor],
+        [output_tensor],
+        [bias, axes]
+    )
+    
+    # Create model
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid('', 13)])
+    model.ir_version = 7
+    
+    # Save
+    output_path = os.path.join(output_dir, 'image_transform.onnx')
+    onnx.save(model, output_path)
+    print(f"Created: {output_path}")
+
+
+def create_sequence_model(output_dir: str) -> None:
+    """Create a model that takes a sequence of tensors and concatenates them.
+    
+    Input: sequence of tensors
+    Output: single concatenated tensor
+    """
+    
+    # Define sequence input
+    seq_input = helper.make_tensor_sequence_value_info(
+        'input_sequence',
+        TensorProto.FLOAT,
+        [None]  # Each tensor in sequence has dynamic shape
+    )
+    
+    # Define output (concatenated result)
+    output_tensor = helper.make_tensor_value_info(
+        'output',
+        TensorProto.FLOAT,
+        [None]
+    )
+    
+    # Create ConcatFromSequence node
+    concat_node = helper.make_node(
+        'ConcatFromSequence',
+        inputs=['input_sequence'],
+        outputs=['output'],
+        axis=0,
+        new_axis=0,
+        name='concat_sequence'
+    )
+    
+    # Create graph
+    graph = helper.make_graph(
+        [concat_node],
+        'sequence_graph',
+        [seq_input],
+        [output_tensor]
+    )
+    
+    # Create model
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid('', 13)])
+    model.ir_version = 7
+    
+    # Save
+    output_path = os.path.join(output_dir, 'sequence_concat.onnx')
+    onnx.save(model, output_path)
+    print(f"Created: {output_path}")
+
+
 def main():
     # Get output directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -292,6 +415,8 @@ def main():
     create_relu_model(output_dir)
     create_identity_int32_model(output_dir)
     create_simple_neural_network(output_dir)
+    create_image_transform_model(output_dir)
+    create_sequence_model(output_dir)
     
     print("\nAll models generated successfully!")
 

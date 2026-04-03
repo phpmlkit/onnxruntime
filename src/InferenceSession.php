@@ -10,9 +10,14 @@ use PhpMlKit\ONNXRuntime\Contracts\Disposable;
 use PhpMlKit\ONNXRuntime\Enums\AllocatorType;
 use PhpMlKit\ONNXRuntime\Enums\DataType;
 use PhpMlKit\ONNXRuntime\Enums\MemoryType;
+use PhpMlKit\ONNXRuntime\Enums\OnnxType;
 use PhpMlKit\ONNXRuntime\Exceptions\InvalidArgumentException;
 use PhpMlKit\ONNXRuntime\Exceptions\InvalidOperationException;
+use PhpMlKit\ONNXRuntime\Exceptions\NotImplementedException;
 use PhpMlKit\ONNXRuntime\FFI\Lib;
+use PhpMlKit\ONNXRuntime\Metadata\MapMetadata;
+use PhpMlKit\ONNXRuntime\Metadata\SequenceMetadata;
+use PhpMlKit\ONNXRuntime\Metadata\TensorMetadata;
 
 /**
  * ONNX Runtime Inference Session.
@@ -34,22 +39,23 @@ use PhpMlKit\ONNXRuntime\FFI\Lib;
  */
 class InferenceSession implements Disposable
 {
-    private CData $handle;
     private CData $memoryInfo;
+
+    /** @var array<string, MapMetadata|SequenceMetadata|TensorMetadata> */
     private array $inputMetadata = [];
+
+    /** @var array<string, MapMetadata|SequenceMetadata|TensorMetadata> */
     private array $outputMetadata = [];
+
     private bool $disposed = false;
-    private Environment $environment;
 
     /**
      * Private constructor. Use factory methods.
      *
      * @param Environment $environment The environment managing this session
      */
-    private function __construct(CData $handle, Environment $environment)
+    private function __construct(private CData $handle, private Environment $environment)
     {
-        $this->handle = $handle;
-        $this->environment = $environment;
         $api = Lib::api();
         $this->memoryInfo = $api->createCpuMemoryInfo(AllocatorType::ARENA_ALLOCATOR, MemoryType::DEFAULT);
 
@@ -74,10 +80,10 @@ class InferenceSession implements Disposable
     {
         $api = Lib::api();
 
-        $environment = Environment::acquire();
-
+        $environment = Environment::instance();
         $options ??= SessionOptions::default();
-        $handle = $api->createSession($environment->getHandle(), $path, $options);
+
+        $handle = $api->createSession($environment, $path, $options);
 
         return new self($handle, $environment);
     }
@@ -94,10 +100,10 @@ class InferenceSession implements Disposable
     {
         $api = Lib::api();
 
-        $environment = Environment::acquire();
-
+        $environment = Environment::instance();
         $options ??= SessionOptions::default();
-        $handle = $api->createSessionFromArray($environment->getHandle(), $bytes, $options);
+
+        $handle = $api->createSessionFromArray($environment, $bytes, $options);
 
         return new self($handle, $environment);
     }
@@ -130,15 +136,15 @@ class InferenceSession implements Disposable
 
         $api = Lib::api();
         $options ??= RunOptions::default();
-        $outputOrtValues = $api->run($this->handle, $options, $inputNames, $inputValues, $outputNames);
+        $outputValues = $api->run($this->handle, $options, $inputNames, $inputValues, $outputNames);
 
-        return $this->prepareOutputs($outputOrtValues, $outputNames, $inputType);
+        return $this->prepareOutputs($outputValues, $outputNames, $inputType);
     }
 
     /**
      * Get input metadata.
      *
-     * @return array<string, array{name: string, shape: int[], dtype: DataType}>
+     * @return array<string, MapMetadata|SequenceMetadata|TensorMetadata>
      */
     public function inputs(): array
     {
@@ -148,7 +154,7 @@ class InferenceSession implements Disposable
     /**
      * Get output metadata.
      *
-     * @return array<string, array{name: string, shape: int[], dtype: DataType}>
+     * @return array<string, MapMetadata|SequenceMetadata|TensorMetadata>
      */
     public function outputs(): array
     {
@@ -210,7 +216,7 @@ class InferenceSession implements Disposable
             if (!$isNDArray && !$isOrtValue) {
                 throw new InvalidArgumentException(
                     "Input '{$name}' must be an OrtValue or NDArray instance, "
-                    .\gettype($value).' given'
+                        .\gettype($value).' given'
                 );
             }
 
@@ -220,7 +226,7 @@ class InferenceSession implements Disposable
             if ($actualType !== $inputType) {
                 throw new InvalidArgumentException(
                     "Mixed input types not supported. Input '{$name}' is {$actualType}, "
-                    ."but expected all inputs to be {$inputType}"
+                        ."but expected all inputs to be {$inputType}"
                 );
             }
         }
@@ -239,7 +245,7 @@ class InferenceSession implements Disposable
         if (!empty($unexpected)) {
             throw new InvalidArgumentException(
                 'Unexpected input(s): '.implode(', ', $unexpected)
-                .'. Expected: '.implode(', ', $expectedInputNames)
+                    .'. Expected: '.implode(', ', $expectedInputNames)
             );
         }
 
@@ -274,18 +280,18 @@ class InferenceSession implements Disposable
      *
      * Converts OrtValue outputs to NDArray if inputs were NDArray.
      *
-     * @param array<OrtValue>      $outputOrtValues Output values from inference
-     * @param array<string>        $outputNames     Output names in order
-     * @param 'ndarray'|'ortvalue' $inputType       Input type
+     * @param array<OrtValue>      $outputValues Output values from inference
+     * @param array<string>        $outputNames  Output names in order
+     * @param 'ndarray'|'ortvalue' $inputType    Input type
      *
      * @return array<string, NDArray|OrtValue> Named outputs
      */
-    private function prepareOutputs(array $outputOrtValues, array $outputNames, string $inputType): array
+    private function prepareOutputs(array $outputValues, array $outputNames, string $inputType): array
     {
         $result = [];
 
         foreach ($outputNames as $i => $name) {
-            $ortValue = $outputOrtValues[$i];
+            $ortValue = $outputValues[$i];
             $result[$name] = 'ndarray' === $inputType ? $ortValue->toNDArray() : $ortValue;
         }
 
@@ -298,6 +304,7 @@ class InferenceSession implements Disposable
     private function cacheMetadata(): void
     {
         $api = Lib::api();
+        $allocator = $api->getAllocatorWithDefaultOptions();
 
         $inputCount = $api->sessionGetInputCount($this->handle);
 
@@ -305,12 +312,8 @@ class InferenceSession implements Disposable
             $typeInfo = $api->sessionGetInputTypeInfo($this->handle, $i);
 
             try {
-                $name = $this->getInputName($i);
-                $this->inputMetadata[$name] = [
-                    'name' => $name,
-                    'shape' => $this->getInputShape($typeInfo),
-                    'dtype' => $this->getInputType($typeInfo),
-                ];
+                $name = $api->sessionGetInputName($this->handle, $i, $allocator);
+                $this->inputMetadata[$name] = $this->createMetadataFromTypeInfo($typeInfo);
             } finally {
                 $api->releaseTypeInfo($typeInfo);
             }
@@ -322,12 +325,8 @@ class InferenceSession implements Disposable
             $typeInfo = $api->sessionGetOutputTypeInfo($this->handle, $i);
 
             try {
-                $name = $this->getOutputName($i);
-                $this->outputMetadata[$name] = [
-                    'name' => $name,
-                    'shape' => $this->getOutputShape($typeInfo),
-                    'dtype' => $this->getOutputType($typeInfo),
-                ];
+                $name = $api->sessionGetOutputName($this->handle, $i, $allocator);
+                $this->outputMetadata[$name] = $this->createMetadataFromTypeInfo($typeInfo);
             } finally {
                 $api->releaseTypeInfo($typeInfo);
             }
@@ -335,111 +334,84 @@ class InferenceSession implements Disposable
     }
 
     /**
-     * Get input name.
-     *
-     * @param int $index Input index
-     *
-     * @return string Input name
-     */
-    private function getInputName(int $index): string
-    {
-        $api = Lib::api();
-        $allocator = $api->getAllocatorWithDefaultOptions();
-
-        return $api->sessionGetInputName($this->handle, $index, $allocator);
-    }
-
-    /**
-     * Get input shape.
-     *
-     * @param CData $typeInfo Input type info
-     *
-     * @return int[] Input shape
-     */
-    private function getInputShape(CData $typeInfo): array
-    {
-        return $this->getShapeFromTypeInfo($typeInfo);
-    }
-
-    /**
-     * Get input type.
-     *
-     * @param CData $typeInfo Input type info
-     *
-     * @return DataType Input element type
-     */
-    private function getInputType(CData $typeInfo): DataType
-    {
-        return $this->getElementTypeFromTypeInfo($typeInfo);
-    }
-
-    /**
-     * Get output name.
-     *
-     * @param int $index Output index
-     *
-     * @return string Output name
-     */
-    private function getOutputName(int $index): string
-    {
-        $api = Lib::api();
-        $allocator = $api->getAllocatorWithDefaultOptions();
-
-        return $api->sessionGetOutputName($this->handle, $index, $allocator);
-    }
-
-    /**
-     * Get output shape.
-     *
-     * @param CData $typeInfo Output type info
-     *
-     * @return int[] Output shape
-     */
-    private function getOutputShape(CData $typeInfo): array
-    {
-        return $this->getShapeFromTypeInfo($typeInfo);
-    }
-
-    /**
-     * Get output element type.
-     *
-     * @param CData $typeInfo Output type info
-     *
-     * @return DataType Output element type
-     */
-    private function getOutputType(CData $typeInfo): DataType
-    {
-        return $this->getElementTypeFromTypeInfo($typeInfo);
-    }
-
-    /**
-     * Get shape from type info.
+     * Create metadata from type info.
      *
      * @param CData $typeInfo OrtTypeInfo pointer
      *
-     * @return int[] Shape
+     * @throws NotImplementedException for unsupported types
      */
-    private function getShapeFromTypeInfo(CData $typeInfo): array
+    private function createMetadataFromTypeInfo(CData $typeInfo): MapMetadata|SequenceMetadata|TensorMetadata
+    {
+        $api = Lib::api();
+        $onnxType = $api->getOnnxTypeFromTypeInfo($typeInfo);
+
+        return match ($onnxType) {
+            OnnxType::TENSOR, OnnxType::SPARSE_TENSOR => $this->createTensorMetadata($typeInfo),
+            OnnxType::SEQUENCE => $this->createSequenceMetadata($typeInfo),
+            OnnxType::MAP => $this->createMapMetadata($typeInfo),
+            OnnxType::OPTIONAL => throw new NotImplementedException('OPTIONAL type is not supported'),
+            default => throw new NotImplementedException("ONNX type '{$onnxType->name}' is not supported"),
+        };
+    }
+
+    /**
+     * Create tensor metadata from type info.
+     *
+     * @param CData $typeInfo OrtTypeInfo pointer
+     */
+    private function createTensorMetadata(CData $typeInfo): TensorMetadata
     {
         $api = Lib::api();
         $tensorInfo = $api->castTypeInfoToTensorInfo($typeInfo);
 
-        return $api->getDimensions($tensorInfo);
+        $dataType = $api->getTensorElementType($tensorInfo);
+        $shape = $api->getDimensions($tensorInfo);
+        $symbolicShape = $api->getSymbolicDimensions($tensorInfo);
+
+        return new TensorMetadata($dataType, $shape, $symbolicShape);
     }
 
     /**
-     * Get element type from type info.
+     * Create sequence metadata from type info.
      *
      * @param CData $typeInfo OrtTypeInfo pointer
-     *
-     * @return DataType Element type
      */
-    private function getElementTypeFromTypeInfo(CData $typeInfo): DataType
+    private function createSequenceMetadata(CData $typeInfo): SequenceMetadata
     {
         $api = Lib::api();
-        $tensorInfo = $api->castTypeInfoToTensorInfo($typeInfo);
+        $sequenceInfo = $api->castTypeInfoToSequenceTypeInfo($typeInfo);
 
-        return $api->getTensorElementType($tensorInfo);
+        $elementTypeInfo = $api->getSequenceElementType($sequenceInfo);
+
+        try {
+            $elementMetadata = $this->createMetadataFromTypeInfo($elementTypeInfo);
+
+            return new SequenceMetadata($elementMetadata);
+        } finally {
+            $api->releaseTypeInfo($elementTypeInfo);
+        }
+    }
+
+    /**
+     * Create map metadata from type info.
+     *
+     * @param CData $typeInfo OrtTypeInfo pointer
+     */
+    private function createMapMetadata(CData $typeInfo): MapMetadata
+    {
+        $api = Lib::api();
+        $mapInfo = $api->castTypeInfoToMapTypeInfo($typeInfo);
+
+        $keyType = $api->getMapKeyType($mapInfo);
+        $valueTypeInfo = $api->getMapValueType($mapInfo);
+
+        try {
+            $valueMetadata = $this->createMetadataFromTypeInfo($valueTypeInfo);
+
+            return new MapMetadata($keyType, $valueMetadata);
+        } finally {
+            $api->releaseTypeInfo($valueTypeInfo);
+        }
     }
 
     /**

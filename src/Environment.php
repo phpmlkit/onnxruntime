@@ -50,7 +50,7 @@ final class Environment implements Disposable
      * This method is thread-safe. If an environment doesn't exist, it will be created.
      * The returned instance must be disposed when no longer needed.
      */
-    public static function acquire(): self
+    public static function instance(): self
     {
         if (null === self::$instance) {
             self::$instance = new self();

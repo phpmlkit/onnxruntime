@@ -9,6 +9,7 @@ use PhpMlKit\NDArray\NDArray;
 use PhpMlKit\ONNXRuntime\Enums\DataType;
 use PhpMlKit\ONNXRuntime\Enums\ExecutionMode;
 use PhpMlKit\ONNXRuntime\Enums\GraphOptimizationLevel;
+use PhpMlKit\ONNXRuntime\Enums\OnnxType;
 use PhpMlKit\ONNXRuntime\Exception;
 use PhpMlKit\ONNXRuntime\Exceptions\FailException;
 use PhpMlKit\ONNXRuntime\Exceptions\InvalidArgumentException;
@@ -16,6 +17,8 @@ use PhpMlKit\ONNXRuntime\Exceptions\InvalidProtobufException;
 use PhpMlKit\ONNXRuntime\Exceptions\NoSuchFileException;
 use PhpMlKit\ONNXRuntime\FFI\Lib;
 use PhpMlKit\ONNXRuntime\InferenceSession;
+use PhpMlKit\ONNXRuntime\Metadata\SequenceMetadata;
+use PhpMlKit\ONNXRuntime\Metadata\TensorMetadata;
 use PhpMlKit\ONNXRuntime\OrtValue;
 use PhpMlKit\ONNXRuntime\SessionOptions;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -217,12 +220,23 @@ class InferenceSessionTest extends TestCase
         $session = InferenceSession::fromFile($modelPath);
         $inputs = $session->inputs();
 
-        $expected = [
-            'a' => ['name' => 'a', 'shape' => [-1], 'dtype' => DataType::FLOAT],
-            'b' => ['name' => 'b', 'shape' => [-1], 'dtype' => DataType::FLOAT],
-        ];
+        $this->assertCount(2, $inputs);
+        $this->assertArrayHasKey('a', $inputs);
+        $this->assertArrayHasKey('b', $inputs);
 
-        $this->assertSame($expected, $inputs);
+        // Check that inputs are TensorMetadata instances
+        $this->assertInstanceOf(TensorMetadata::class, $inputs['a']);
+        $this->assertInstanceOf(TensorMetadata::class, $inputs['b']);
+
+        // Check properties
+        $this->assertEquals(OnnxType::TENSOR, $inputs['a']->getType());
+        $this->assertEquals(DataType::FLOAT, $inputs['a']->getDataType());
+        $this->assertEquals([-1], $inputs['a']->getShape());
+        $this->assertTrue($inputs['a']->hasDynamicDimensions());
+
+        $this->assertEquals(OnnxType::TENSOR, $inputs['b']->getType());
+        $this->assertEquals(DataType::FLOAT, $inputs['b']->getDataType());
+        $this->assertEquals([-1], $inputs['b']->getShape());
     }
 
     #[Test]
@@ -236,11 +250,38 @@ class InferenceSessionTest extends TestCase
         $session = InferenceSession::fromFile($modelPath);
         $outputs = $session->outputs();
 
-        $expected = [
-            'c' => ['name' => 'c', 'shape' => [-1], 'dtype' => DataType::FLOAT],
-        ];
+        $this->assertCount(1, $outputs);
+        $this->assertArrayHasKey('c', $outputs);
 
-        $this->assertSame($expected, $outputs);
+        $this->assertInstanceOf(TensorMetadata::class, $outputs['c']);
+
+        $this->assertEquals(OnnxType::TENSOR, $outputs['c']->getType());
+        $this->assertEquals(DataType::FLOAT, $outputs['c']->getDataType());
+        $this->assertEquals([-1], $outputs['c']->getShape());
+        $this->assertTrue($outputs['c']->hasDynamicDimensions());
+    }
+
+    #[Test]
+    public function itCanConvertMetadataToArray(): void
+    {
+        $modelPath = self::$fixturesDir.'/add.onnx';
+        if (!file_exists($modelPath)) {
+            $this->markTestSkipped('Test model not available');
+        }
+
+        $session = InferenceSession::fromFile($modelPath);
+        $inputs = $session->inputs();
+
+        $array = $inputs['a']->toArray();
+
+        $this->assertIsArray($array);
+        $this->assertArrayHasKey('type', $array);
+        $this->assertArrayHasKey('dataType', $array);
+        $this->assertArrayHasKey('shape', $array);
+        $this->assertArrayHasKey('symbolicShape', $array);
+        $this->assertEquals('TENSOR', $array['type']);
+        $this->assertEquals('FLOAT', $array['dataType']);
+        $this->assertEquals([-1], $array['shape']);
     }
 
     #[Test]
@@ -464,5 +505,70 @@ class InferenceSessionTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Inputs cannot be empty');
         $session->run([]);
+    }
+
+    #[Test]
+    public function itCanGetSymbolicDimensionsFromImageModel(): void
+    {
+        $modelPath = self::$fixturesDir.'/image_transform.onnx';
+        if (!file_exists($modelPath)) {
+            $this->markTestSkipped('Test model not available');
+        }
+
+        $session = InferenceSession::fromFile($modelPath);
+        $inputs = $session->inputs();
+
+        $this->assertCount(1, $inputs);
+        $this->assertArrayHasKey('image', $inputs);
+
+        $imageMetadata = $inputs['image'];
+        $this->assertInstanceOf(TensorMetadata::class, $imageMetadata);
+
+        $this->assertEquals([-1, -1, -1, -1], $imageMetadata->getShape());
+        $this->assertEquals(['batch_size', 'num_channels', 'height', 'width'], $imageMetadata->getSymbolicShape());
+
+        // Output: channels dimension is constrained to 3 by the bias tensor
+        // Bias has shape [3], so output must have exactly 3 channels
+        $outputs = $session->outputs();
+        $this->assertCount(1, $outputs);
+        $outputMetadata = $outputs['output'];
+        $this->assertInstanceOf(TensorMetadata::class, $outputMetadata);
+
+        $this->assertEquals([-1, 3, -1, -1], $outputMetadata->getShape());
+        $this->assertEquals(['batch_size', '', 'height', 'width'], $outputMetadata->getSymbolicShape());
+    }
+
+    #[Test]
+    public function itCanGetSequenceMetadata(): void
+    {
+        $modelPath = self::$fixturesDir.'/sequence_concat.onnx';
+        if (!file_exists($modelPath)) {
+            $this->markTestSkipped('Test model not available');
+        }
+
+        $session = InferenceSession::fromFile($modelPath);
+        $inputs = $session->inputs();
+
+        $this->assertCount(1, $inputs);
+        $this->assertArrayHasKey('input_sequence', $inputs);
+
+        $sequenceMetadata = $inputs['input_sequence'];
+        $this->assertInstanceOf(SequenceMetadata::class, $sequenceMetadata);
+
+        $this->assertEquals(OnnxType::SEQUENCE, $sequenceMetadata->getType());
+
+        $elementMetadata = $sequenceMetadata->getElementMetadata();
+        $this->assertInstanceOf(TensorMetadata::class, $elementMetadata);
+        $this->assertEquals(OnnxType::TENSOR, $elementMetadata->getType());
+        $this->assertEquals(DataType::FLOAT, $elementMetadata->getDataType());
+
+        $outputs = $session->outputs();
+        $this->assertCount(1, $outputs);
+        $this->assertArrayHasKey('output', $outputs);
+
+        $outputMetadata = $outputs['output'];
+        $this->assertInstanceOf(TensorMetadata::class, $outputMetadata);
+        $this->assertEquals(OnnxType::TENSOR, $outputMetadata->getType());
+        $this->assertEquals(DataType::FLOAT, $outputMetadata->getDataType());
     }
 }

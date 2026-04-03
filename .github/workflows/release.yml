@@ -6,9 +6,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'ONNX Runtime version to package (optional - defaults to ONNXRUNTIME_VERSION file)'
+        description: 'ONNX Runtime version to package'
         required: false
-        default: ''
         type: string
 
 jobs:

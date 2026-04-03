@@ -10,6 +10,7 @@ use PhpMlKit\ONNXRuntime\Enums\DataType;
 use PhpMlKit\ONNXRuntime\Enums\LoggingLevel;
 use PhpMlKit\ONNXRuntime\Enums\MemoryType;
 use PhpMlKit\ONNXRuntime\Enums\OnnxType;
+use PhpMlKit\ONNXRuntime\Environment;
 use PhpMlKit\ONNXRuntime\Exception;
 use PhpMlKit\ONNXRuntime\OrtValue;
 use PhpMlKit\ONNXRuntime\RunOptions;
@@ -264,7 +265,7 @@ class Api
     /**
      * Create an inference session from a model file.
      *
-     * @param CData          $env       OrtEnv pointer
+     * @param Environment    $env       OrtEnv pointer
      * @param string         $modelPath Path to the ONNX model file
      * @param SessionOptions $options   Session options
      *
@@ -272,10 +273,10 @@ class Api
      *
      * @throws Exception on error
      */
-    public function createSession(CData $env, string $modelPath, SessionOptions $options): CData
+    public function createSession(Environment $env, string $modelPath, SessionOptions $options): CData
     {
         $session = $this->ffi->new('OrtSession*');
-        $status = ($this->api->CreateSession)($env, Lib::ortString($modelPath), $options->getHandle(), \FFI::addr($session));
+        $status = ($this->api->CreateSession)($env->getHandle(), Lib::ortString($modelPath), $options->getHandle(), \FFI::addr($session));
         Lib::checkStatus($status);
 
         return $session;
@@ -284,7 +285,7 @@ class Api
     /**
      * Create an inference session from model bytes.
      *
-     * @param CData          $env        OrtEnv pointer
+     * @param Environment    $env        OrtEnv pointer
      * @param string         $modelBytes Raw ONNX model bytes
      * @param SessionOptions $options    Session options
      *
@@ -292,11 +293,11 @@ class Api
      *
      * @throws Exception on error
      */
-    public function createSessionFromArray(CData $env, string $modelBytes, SessionOptions $options): CData
+    public function createSessionFromArray(Environment $env, string $modelBytes, SessionOptions $options): CData
     {
         $session = $this->ffi->new('OrtSession*');
         $status = ($this->api->CreateSessionFromArray)(
-            $env,
+            $env->getHandle(),
             $modelBytes,
             \strlen($modelBytes),
             $options->getHandle(),
@@ -644,11 +645,157 @@ class Api
      *
      * @param CData $typeInfo OrtTypeInfo pointer
      *
-     * @return int ONNX type enum value
+     * @return OnnxType ONNX type enum value
+     *
+     * @throws Exception on error
      */
-    public function getONNXTypeFromTypeInfo(CData $typeInfo): int
+    public function getOnnxTypeFromTypeInfo(CData $typeInfo): OnnxType
     {
-        return ($this->api->GetONNXTypeFromTypeInfo)($typeInfo);
+        $onnxType = $this->ffi->new('ONNXType');
+        $status = ($this->api->GetOnnxTypeFromTypeInfo)($typeInfo, \FFI::addr($onnxType));
+        Lib::checkStatus($status);
+
+        return OnnxType::from($onnxType->cdata);
+    }
+
+    /**
+     * Cast type info to sequence type info.
+     *
+     * @param CData $typeInfo OrtTypeInfo pointer
+     *
+     * @return CData OrtSequenceTypeInfo pointer
+     *
+     * @throws Exception on error
+     */
+    public function castTypeInfoToSequenceTypeInfo(CData $typeInfo): CData
+    {
+        $sequenceInfo = $this->ffi->new('OrtSequenceTypeInfo*');
+        $status = ($this->api->CastTypeInfoToSequenceTypeInfo)($typeInfo, \FFI::addr($sequenceInfo));
+        Lib::checkStatus($status);
+
+        return $sequenceInfo;
+    }
+
+    /**
+     * Cast type info to map type info.
+     *
+     * @param CData $typeInfo OrtTypeInfo pointer
+     *
+     * @return CData OrtMapTypeInfo pointer
+     *
+     * @throws Exception on error
+     */
+    public function castTypeInfoToMapTypeInfo(CData $typeInfo): CData
+    {
+        $mapInfo = $this->ffi->new('OrtMapTypeInfo*');
+        $status = ($this->api->CastTypeInfoToMapTypeInfo)($typeInfo, \FFI::addr($mapInfo));
+        Lib::checkStatus($status);
+
+        return $mapInfo;
+    }
+
+    /**
+     * Get sequence element type.
+     *
+     * @param CData $sequenceInfo OrtSequenceTypeInfo pointer
+     *
+     * @return CData OrtTypeInfo pointer for the element type
+     *
+     * @throws Exception on error
+     */
+    public function getSequenceElementType(CData $sequenceInfo): CData
+    {
+        $typeInfo = $this->ffi->new('OrtTypeInfo*');
+        $status = ($this->api->GetSequenceElementType)($sequenceInfo, \FFI::addr($typeInfo));
+        Lib::checkStatus($status);
+
+        return $typeInfo;
+    }
+
+    /**
+     * Get map key type.
+     *
+     * @param CData $mapInfo OrtMapTypeInfo pointer
+     *
+     * @return DataType Key type
+     *
+     * @throws Exception on error
+     */
+    public function getMapKeyType(CData $mapInfo): DataType
+    {
+        $keyType = $this->ffi->new('ONNXTensorElementDataType');
+        $status = ($this->api->GetMapKeyType)($mapInfo, \FFI::addr($keyType));
+        Lib::checkStatus($status);
+
+        return DataType::from($keyType->cdata);
+    }
+
+    /**
+     * Get map value type.
+     *
+     * @param CData $mapInfo OrtMapTypeInfo pointer
+     *
+     * @return CData OrtTypeInfo pointer for the value type
+     *
+     * @throws Exception on error
+     */
+    public function getMapValueType(CData $mapInfo): CData
+    {
+        $typeInfo = $this->ffi->new('OrtTypeInfo*');
+        $status = ($this->api->GetMapValueType)($mapInfo, \FFI::addr($typeInfo));
+        Lib::checkStatus($status);
+
+        return $typeInfo;
+    }
+
+    /**
+     * Get symbolic dimension names from tensor info.
+     *
+     * @param CData $tensorInfo OrtTensorTypeAndShapeInfo pointer
+     *
+     * @return array<string> Symbolic dimension names (empty string for non-symbolic dimensions)
+     *
+     * @throws Exception on error
+     */
+    public function getSymbolicDimensions(CData $tensorInfo): array
+    {
+        $dimCount = $this->getDimensionsCount($tensorInfo);
+
+        if (0 === $dimCount) {
+            return [];
+        }
+
+        $symbolicDimsPtr = $this->ffi->new("char*[{$dimCount}]");
+        $status = ($this->api->GetSymbolicDimensions)($tensorInfo, $symbolicDimsPtr, $dimCount);
+        Lib::checkStatus($status);
+
+        $symbolicDims = [];
+        for ($i = 0; $i < $dimCount; ++$i) {
+            $dimPtr = $symbolicDimsPtr[$i];
+            $symbolicDims[] = null !== $dimPtr ? \FFI::string($dimPtr) : '';
+        }
+
+        return $symbolicDims;
+    }
+
+    /**
+     * Release sequence type info.
+     *
+     * @param CData $sequenceInfo OrtSequenceTypeInfo pointer
+     */
+    public function releaseSequenceTypeInfo(CData $sequenceInfo): void
+    {
+        ($this->api->ReleaseSequenceTypeInfo)($sequenceInfo);
+    }
+
+    /**
+     * Release map type info.
+     *
+     * @param CData $mapInfo OrtMapTypeInfo pointer
+     */
+    public function releaseMapTypeInfo(CData $mapInfo): void
+    {
+        ($this->api->ReleaseMapTypeInfo)($mapInfo);
     }
 
     /**

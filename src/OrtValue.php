@@ -35,9 +35,9 @@ final class OrtValue implements Disposable
      *
      * @param CData      $handle       Native OrtValue handle
      * @param OnnxType   $type         ONNX type
-     * @param null|CData $memoryHandle Optional internal buffer reference (keeps memory alive)
      * @param DataType   $dataType     Data type (Undefined if not tensor)
      * @param null|array $shape        Shape (if tensor)
+     * @param null|CData $memoryHandle Optional internal buffer reference (keeps memory alive)
      */
     private function __construct(
         public readonly CData $handle,
