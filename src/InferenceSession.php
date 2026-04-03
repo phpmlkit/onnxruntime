@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpMlKit\ONNXRuntime;
 
 use FFI\CData;
+use PhpMlKit\NDArray\NDArray;
 use PhpMlKit\ONNXRuntime\Contracts\Disposable;
 use PhpMlKit\ONNXRuntime\Enums\AllocatorType;
 use PhpMlKit\ONNXRuntime\Enums\DataType;
@@ -33,18 +34,22 @@ use PhpMlKit\ONNXRuntime\FFI\Lib;
  */
 class InferenceSession implements Disposable
 {
+    private CData $handle;
     private CData $memoryInfo;
     private array $inputMetadata = [];
     private array $outputMetadata = [];
     private bool $disposed = false;
+    private Environment $environment;
 
     /**
      * Private constructor. Use factory methods.
      *
      * @param Environment $environment The environment managing this session
      */
-    private function __construct(private CData $handle, private Environment $environment)
+    private function __construct(CData $handle, Environment $environment)
     {
+        $this->handle = $handle;
+        $this->environment = $environment;
         $api = Lib::api();
         $this->memoryInfo = $api->createCpuMemoryInfo(AllocatorType::ARENA_ALLOCATOR, MemoryType::DEFAULT);
 
@@ -100,34 +105,34 @@ class InferenceSession implements Disposable
     /**
      * Run inference.
      *
-     * @param array<string, OrtValue> $inputs      Named input OrtValues
-     * @param null|array<string>      $outputNames Specific outputs to return (null for all)
-     * @param null|RunOptions         $options     Run options (null for defaults)
+     * Supports both OrtValue and NDArray inputs. All inputs must be of the same type.
+     * Returns outputs in the same type as the inputs.
      *
-     * @return array<string, OrtValue> Named output OrtValues
+     * @template T of OrtValue|\PhpMlKit\NDArray\NDArray
      *
-     * @throws InvalidArgumentException If inputs are invalid
+     * @param array<string, T>   $inputs      Named input values (OrtValue or NDArray)
+     * @param null|array<string> $outputNames Specific outputs to return (null for all)
+     * @param null|RunOptions    $options     Run options (null for defaults)
+     *
+     * @return array<string, T> Named output values (same type as inputs)
+     *
+     * @throws InvalidArgumentException If inputs are invalid or mixed types
      */
     public function run(array $inputs, ?array $outputNames = null, ?RunOptions $options = null): array
     {
         $this->ensureOpen();
 
-        $api = Lib::api();
-
         $inputNames = array_keys($this->inputMetadata);
         $outputNames ??= array_keys($this->outputMetadata);
 
-        $inputValues = $this->prepareInputs($inputs, $inputNames);
+        $inputType = $this->validateInputs($inputs, $inputNames);
+        $inputValues = $this->prepareInputs($inputs, $inputNames, $inputType);
+
+        $api = Lib::api();
         $options ??= RunOptions::default();
+        $outputOrtValues = $api->run($this->handle, $options, $inputNames, $inputValues, $outputNames);
 
-        $outputValues = $api->run($this->handle, $options, $inputNames, $inputValues, $outputNames);
-
-        $result = [];
-        foreach ($outputNames as $i => $name) {
-            $result[$name] = $outputValues[$i];
-        }
-
-        return $result;
+        return $this->prepareOutputs($outputOrtValues, $outputNames, $inputType);
     }
 
     /**
@@ -175,55 +180,116 @@ class InferenceSession implements Disposable
     }
 
     /**
-     * Prepare inputs for inference.
+     * Validate inputs and detect their type.
      *
-     * @param array<string, OrtValue> $inputs             Named input OrtValues
-     * @param array<string>           $expectedInputNames Expected input names
+     * Checks that:
+     * - All inputs are of the same type (OrtValue or NDArray)
+     * - No required inputs are missing
+     * - No unexpected inputs are provided
      *
-     * @return array<OrtValue> OrtValues in expected order
+     * @param array<string, mixed> $inputs             Named input values
+     * @param array<string>        $expectedInputNames Expected input names from model
      *
-     * @throws InvalidArgumentException If inputs are missing or unexpected
+     * @return string 'ortvalue' or 'ndarray'
+     *
+     * @throws InvalidArgumentException If validation fails
      */
-    private function prepareInputs(array $inputs, array $expectedInputNames): array
+    private function validateInputs(array $inputs, array $expectedInputNames): string
     {
-        $providedInputNames = [];
-        $ortValues = [];
+        if (empty($inputs)) {
+            throw new InvalidArgumentException('Inputs cannot be empty');
+        }
 
-        foreach ($inputs as $name => $ortValue) {
-            if (!$ortValue instanceof OrtValue) {
+        $inputType = null;
+        $ndarrayClass = NDArray::class;
+
+        foreach ($inputs as $name => $value) {
+            $isNDArray = class_exists($ndarrayClass) && $value instanceof $ndarrayClass;
+            $isOrtValue = $value instanceof OrtValue;
+
+            if (!$isNDArray && !$isOrtValue) {
                 throw new InvalidArgumentException(
-                    "Input '{$name}' must be an OrtValue instance"
+                    "Input '{$name}' must be an OrtValue or NDArray instance, "
+                    .\gettype($value).' given'
                 );
             }
 
-            $providedInputNames[] = $name;
-            $ortValues[$name] = $ortValue;
+            $actualType = $isNDArray ? 'ndarray' : 'ortvalue';
+            $inputType ??= $actualType;
+
+            if ($actualType !== $inputType) {
+                throw new InvalidArgumentException(
+                    "Mixed input types not supported. Input '{$name}' is {$actualType}, "
+                    ."but expected all inputs to be {$inputType}"
+                );
+            }
         }
 
-        $missing = array_diff($expectedInputNames, $providedInputNames);
+        \assert(null !== $inputType);
+
+        $providedNames = array_keys($inputs);
+        $missing = array_diff($expectedInputNames, $providedNames);
         if (!empty($missing)) {
             throw new InvalidArgumentException(
                 'Missing required input(s): '.implode(', ', $missing)
             );
         }
 
-        $unexpected = array_diff($providedInputNames, $expectedInputNames);
+        $unexpected = array_diff($providedNames, $expectedInputNames);
         if (!empty($unexpected)) {
             throw new InvalidArgumentException(
                 'Unexpected input(s): '.implode(', ', $unexpected)
-                    .'. Expected: '.implode(', ', $expectedInputNames)
+                .'. Expected: '.implode(', ', $expectedInputNames)
             );
         }
 
-        // Return in expected order
+        return $inputType;
+    }
+
+    /**
+     * Prepare inputs for inference.
+     *
+     * Converts NDArray inputs to OrtValue and orders them correctly.
+     *
+     * @param array<string, mixed> $inputs     Named input values
+     * @param array<string>        $inputNames Input names in order
+     * @param 'ndarray'|'ortvalue' $inputType  Input type
+     *
+     * @return array<OrtValue> OrtValues in expected order
+     */
+    private function prepareInputs(array $inputs, array $inputNames, string $inputType): array
+    {
         $ordered = [];
-        foreach ($expectedInputNames as $name) {
-            if (isset($ortValues[$name])) {
-                $ordered[] = $ortValues[$name];
-            }
+
+        foreach ($inputNames as $name) {
+            $value = $inputs[$name];
+            $ordered[] = 'ndarray' === $inputType ? OrtValue::fromNDArray($value) : $value;
         }
 
         return $ordered;
+    }
+
+    /**
+     * Prepare outputs after inference.
+     *
+     * Converts OrtValue outputs to NDArray if inputs were NDArray.
+     *
+     * @param array<OrtValue>      $outputOrtValues Output values from inference
+     * @param array<string>        $outputNames     Output names in order
+     * @param 'ndarray'|'ortvalue' $inputType       Input type
+     *
+     * @return array<string, NDArray|OrtValue> Named outputs
+     */
+    private function prepareOutputs(array $outputOrtValues, array $outputNames, string $inputType): array
+    {
+        $result = [];
+
+        foreach ($outputNames as $i => $name) {
+            $ortValue = $outputOrtValues[$i];
+            $result[$name] = 'ndarray' === $inputType ? $ortValue->toNDArray() : $ortValue;
+        }
+
+        return $result;
     }
 
     /**

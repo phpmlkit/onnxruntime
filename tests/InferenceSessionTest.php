@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhpMlKit\ONNXRuntime\Tests;
 
+use PhpMlKit\NDArray\DType;
+use PhpMlKit\NDArray\NDArray;
 use PhpMlKit\ONNXRuntime\Enums\DataType;
 use PhpMlKit\ONNXRuntime\Enums\ExecutionMode;
 use PhpMlKit\ONNXRuntime\Enums\GraphOptimizationLevel;
@@ -403,5 +405,64 @@ class InferenceSessionTest extends TestCase
         $this->expectExceptionMessage('protobuf parsing failed');
 
         InferenceSession::fromBytes('this is not valid protobuf content');
+    }
+
+    #[Test]
+    public function itCanAcceptNDArrayInputs(): void
+    {
+        if (!class_exists(NDArray::class)) {
+            $this->markTestSkipped('NDArray class not available');
+        }
+
+        $modelPath = self::$fixturesDir.'/identity.onnx';
+        if (!file_exists($modelPath)) {
+            $this->markTestSkipped('Test model not available');
+        }
+
+        $session = InferenceSession::fromFile($modelPath);
+
+        $input = NDArray::array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], DType::Float32);
+        $outputs = $session->run(['input' => $input]);
+
+        $this->assertArrayHasKey('output', $outputs);
+        $this->assertInstanceOf(NDArray::class, $outputs['output']);
+        $this->assertEquals([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], $outputs['output']->toArray());
+    }
+
+    #[Test]
+    public function itThrowsForMixedInputTypes(): void
+    {
+        if (!class_exists(NDArray::class)) {
+            $this->markTestSkipped('NDArray class not available');
+        }
+
+        $modelPath = self::$fixturesDir.'/add.onnx';
+        if (!file_exists($modelPath)) {
+            $this->markTestSkipped('Test model not available');
+        }
+
+        $session = InferenceSession::fromFile($modelPath);
+
+        $a = OrtValue::fromArray([1.0, 2.0, 3.0], DataType::FLOAT);
+        $b = NDArray::array([4.0, 5.0, 6.0], DType::Float32);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Mixed input types');
+        $session->run(['a' => $a, 'b' => $b]);
+    }
+
+    #[Test]
+    public function itThrowsForEmptyInputs(): void
+    {
+        $modelPath = self::$fixturesDir.'/identity.onnx';
+        if (!file_exists($modelPath)) {
+            $this->markTestSkipped('Test model not available');
+        }
+
+        $session = InferenceSession::fromFile($modelPath);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Inputs cannot be empty');
+        $session->run([]);
     }
 }

@@ -161,22 +161,15 @@ use PhpMlKit\ONNXRuntime\InferenceSession;
 use PhpMlKit\ONNXRuntime\OrtValue;
 use PhpMlKit\ONNXRuntime\Enums\DataType;
 
-// 1. Load a model
 $session = InferenceSession::fromFile('/path/to/model.onnx');
 
-// 2. Prepare input data
 $inputData = [1.0, 2.0, 3.0, 4.0, 5.0];
 $input = OrtValue::fromArray($inputData, DataType::FLOAT);
 
-// 3. Run inference
 $outputs = $session->run(['input' => $input]);
 
-// 4. Get results
 $result = $outputs['output']->toArray();
 print_r($result);
-
-// 5. Clean up (optional - happens automatically)
-$session->dispose();
 ```
 
 ## Where to Get Models
@@ -267,20 +260,25 @@ $session = InferenceSession::fromBytes($modelBytes);
 #### Running Inference
 
 ```php
-$inputs = ['input' => $inputTensor];
+// Basic inference with OrtValue
+$input = OrtValue::fromArray([1.0, 2.0, 3.0], DataType::FLOAT);
+$outputs = $session->run(['input' => $input]);
+$result = $outputs['output']->toArray();
 
-// Simple inference with all outputs
-$outputs = $session->run(inputs);
-
-// Get specific outputs only (more efficient)
+// Get specific outputs only
 $outputs = $session->run(
-    $inputs,
-    ['output1', 'output2']  // Only compute these outputs
+    ['input' => $input],
+    ['output1', 'output2']
 );
 
 // With run options
 $runOptions = RunOptions::default();
-$outputs = $session->run($inputs, options: $runOptions);
+$outputs = $session->run(['input' => $input], options: $runOptions);
+
+// With NDArray (requires phpmlkit/ndarray)
+$input = NDArray::array([1.0, 2.0, 3.0], DType::Float32);
+$outputs = $session->run(['input' => $input]);
+$result = $outputs['output']; // NDArray
 ```
 
 #### Inspecting Model Metadata
@@ -766,25 +764,28 @@ $tensor->dispose();  // Releases tensor only
 
 ### NDArray Interoperability
 
-If you have the `phpmlkit/ndarray` package installed:
+When the `phpmlkit/ndarray` package is installed, you can work directly with NDArray objects without manual conversion. Pass NDArrays as inputs and receive NDArrays as outputs:
 
 ```php
 use PhpMlKit\NDArray\NDArray;
 use PhpMlKit\NDArray\DType;
-use PhpMlKit\ONNXRuntime\OrtValue;
 
-// Create NDArray
-$ndarray = NDArray::array([[1, 2], [3, 4]], DType::Float32);
+// Create NDArray input
+$input = NDArray::array([[1.0, 2.0], [3.0, 4.0]], DType::Float32);
 
-// Convert to OrtValue (zero-copy friendly helper)
-$tensor = OrtValue::fromNDArray($ndarray);
+// Run inference - NDArrays in, NDArrays out
+$outputs = $session->run(['input' => $input]);
 
-// Run inference
-$outputs = $session->run(['input' => $tensor]);
+// Get NDArray output directly
+$output = $outputs['output'];
 
-// Convert OrtValue output back to NDArray
-$outputNDArray = $outputs['output']->toNDArray();
+echo $output;
+// array(2, 2)
+// [1. 2.]
+// [3. 4.]
 ```
+
+This provides seamless integration with the NDArray ecosystem for numerical computing in PHP.
 
 ### Profiling
 
