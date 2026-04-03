@@ -38,13 +38,32 @@ final class Lib
         ],
     ];
 
-    private const VERSION = '1.24.3';
     private const API_VERSION = 24;
 
     private static ?\FFI $ffi = null;
     private static ?Api $api = null;
     private static ?string $libraryPath = null;
     private static $msvcrt;
+    private static ?string $version = null;
+
+    /**
+     * Get the ONNX Runtime version from the VERSION file.
+     */
+    public static function getVersion(): string
+    {
+        if (null === self::$version) {
+            $versionFile = __DIR__.'/../../ONNXRUNTIME_VERSION';
+            $version = file_get_contents($versionFile);
+            
+            if (false === $version) {
+                throw new \RuntimeException("Could not read version file: {$versionFile}");
+            }
+            
+            self::$version = trim($version);
+        }
+
+        return self::$version;
+    }
 
     /**
      * Get FFI instance (singleton).
@@ -188,7 +207,7 @@ final class Lib
         $libDir = __DIR__.'/../../lib/'.$config['directory'];
 
         // Replace {version} in template
-        $libraryName = str_replace('{version}', self::VERSION, $config['libraryTemplate']);
+        $libraryName = str_replace('{version}', self::getVersion(), $config['libraryTemplate']);
         $libraryPath = $libDir.'/'.$libraryName;
 
         if (file_exists($libraryPath)) {

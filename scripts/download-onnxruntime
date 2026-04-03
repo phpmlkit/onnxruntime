@@ -4,12 +4,12 @@ set -e
 # ONNX Runtime PHP - Library Download Script
 # Downloads prebuilt ONNX Runtime binaries for the current platform
 
-VERSION="1.24.3"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 LIB_DIR="${PROJECT_ROOT}/lib"
 RUNTIME="cpu"
 PLATFORM=""
+VERSION=$(cat "${PROJECT_ROOT}/ONNXRUNTIME_VERSION")
 
 # Colors for output
 RED='\033[0;31m'

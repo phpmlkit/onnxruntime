@@ -6,17 +6,35 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'ONNX Runtime version to package'
+        description: 'ONNX Runtime version to package (optional - defaults to ONNXRUNTIME_VERSION file)'
         required: false
-        default: '1.24.3'
+        default: ''
         type: string
 
-env:
-  ONNXRUNTIME_VERSION: ${{ github.event.inputs.version || '1.24.3' }}
-
 jobs:
+  read-version:
+    name: Read ONNX Runtime Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read-version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Read version (event input or file)
+        id: read-version
+        run: |
+          if [ -z "${{ github.event.inputs.version }}" ]; then
+            VERSION=$(cat ONNXRUNTIME_VERSION)
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using ONNX Runtime version: $VERSION"
+
   build:
     name: Build for ${{ matrix.name }}
+    needs: read-version
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -28,41 +46,54 @@ jobs:
             runner: ubuntu-latest
             runtime: cpu
             archive_ext: tar.gz
-          # Linux x86_64 - CUDA 12
-          - name: Linux x86_64 - CUDA 12
-            platform: linux-x86_64
-            runner: ubuntu-latest
-            runtime: cuda12
-            archive_ext: tar.gz
-          # Linux x86_64 - CUDA 13
-          - name: Linux x86_64 - CUDA 13
-            platform: linux-x86_64
-            runner: ubuntu-latest
-            runtime: cuda13
-            archive_ext: tar.gz
+
           # Linux ARM64 - CPU
           - name: Linux ARM64 - CPU
             platform: linux-arm64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-latest
             runtime: cpu
             archive_ext: tar.gz
+
           # macOS ARM64 - CPU
           - name: macOS ARM64 - CPU
             platform: darwin-arm64
             runner: macos-latest
             runtime: cpu
             archive_ext: tar.gz
+
           # Windows x64 - CPU
           - name: Windows x64 - CPU
             platform: windows-x64
             runner: windows-latest
             runtime: cpu
             archive_ext: zip
+
+          # Linux x86_64 - CUDA 12
+          - name: Linux x86_64 - CUDA 12
+            platform: linux-x86_64
+            runner: ubuntu-latest
+            runtime: cuda12
+            archive_ext: tar.gz
+
+          # Linux x86_64 - CUDA 13
+          - name: Linux x86_64 - CUDA 13
+            platform: linux-x86_64
+            runner: ubuntu-latest
+            runtime: cuda13
+            archive_ext: tar.gz
+
           # Windows x64 - CUDA 12
           - name: Windows x64 - CUDA 12
             platform: windows-x64
             runner: windows-latest
             runtime: cuda12
+            archive_ext: zip
+
+          # Windows x64 - CUDA 13
+          - name: Windows x64 - CUDA 13
+            platform: windows-x64
+            runner: windows-latest
+            runtime: cuda13
             archive_ext: zip
 
     steps:
@@ -72,8 +103,7 @@ jobs:
       - name: Download ONNX Runtime binaries
         shell: bash
         run: |
-          echo "Downloading ONNX Runtime ${{ env.ONNXRUNTIME_VERSION }} for ${{ matrix.platform }} (${{ matrix.runtime }})"
-          bash scripts/download-onnxruntime --platform ${{ matrix.platform }} --runtime ${{ matrix.runtime }} --version ${{ env.ONNXRUNTIME_VERSION }}
+          bash scripts/download-onnxruntime --platform ${{ matrix.platform }} --runtime ${{ matrix.runtime }} --version ${{ needs.read-version.outputs.version }}
 
       - name: Create distribution package (Unix)
         if: matrix.archive_ext == 'tar.gz'
