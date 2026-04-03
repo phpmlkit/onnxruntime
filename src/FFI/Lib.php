@@ -54,11 +54,11 @@ final class Lib
         if (null === self::$version) {
             $versionFile = __DIR__.'/../../ONNXRUNTIME_VERSION';
             $version = file_get_contents($versionFile);
-            
+
             if (false === $version) {
                 throw new \RuntimeException("Could not read version file: {$versionFile}");
             }
-            
+
             self::$version = trim($version);
         }
 

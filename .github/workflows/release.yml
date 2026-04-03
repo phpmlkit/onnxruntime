@@ -19,7 +19,7 @@ jobs:
       version: ${{ steps.read-version.outputs.version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Read version (event input or file)
         id: read-version
@@ -118,8 +118,9 @@ jobs:
           cp -r scripts "${DIST_NAME}/"
           cp composer.json "${DIST_NAME}/"
           cp LICENSE "${DIST_NAME}/"
-          cp README.md "${DIST_NAME}/" 2>/dev/null || true
+          cp README.md "${DIST_NAME}/"
           cp CHANGELOG.md "${DIST_NAME}/" 2>/dev/null || true
+          cp ONNXRUNTIME_VERSION "${DIST_NAME}/"
           
           # Copy downloaded library
           cp -r lib "${DIST_NAME}/"
@@ -143,8 +144,9 @@ jobs:
           Copy-Item -Path scripts -Destination $distName -Recurse -Force
           Copy-Item -Path composer.json -Destination $distName -Force
           Copy-Item -Path LICENSE -Destination $distName -Force
-          if (Test-Path README.md) { Copy-Item -Path README.md -Destination $distName -Force }
+          Copy-Item -Path README.md -Destination $distName -Force
           if (Test-Path CHANGELOG.md) { Copy-Item -Path CHANGELOG.md -Destination $distName -Force }
+          Copy-Item -Path ONNXRUNTIME_VERSION -Destination $distName -Force
           
           # Copy downloaded library
           Copy-Item -Path lib -Destination $distName -Recurse -Force
