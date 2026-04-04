@@ -22,10 +22,10 @@ This library is a **reimagined and optimized** version inspired by the original 
 
 - **FFI-First Architecture**: Direct FFI buffer handling for zero-copy operations with other libraries
 - **Comprehensive Type Support**: Full support for sequences, maps, and all ONNX value types
-- **Better Memory Management**: Sophisticated resource tracking and cleanup mechanisms
+- **First-Class NDArray Support**: Accept NDArray objects as inputs and receive them as outputs for seamless numerical computing
 - **Exposed API**: Direct access to `OrtValue` objects for inputs/outputs instead of PHP arrays only
 
-The key difference: this library exposes `OrtValue` objects directly, allowing you to pass data from other FFI libraries (like NDArray) without the overhead of copying through PHP arrays. This enables true zero-copy workflows when working with machine learning pipelines.
+The key difference: this library exposes `OrtValue` objects directly, allowing you to pass data from other FFI libraries without the overhead of copying through PHP arrays. Combined with first-class NDArray support, this enables true zero-copy workflows when working with machine learning pipelines.
 
 ## Table of Contents
 
