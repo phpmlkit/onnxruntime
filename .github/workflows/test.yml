@@ -31,3 +31,22 @@ jobs:
 
       - name: Run tests
         run: composer test:pretty
+
+  cs-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Install Composer
+        uses: ramsey/composer-install@v4
+
+      - name: Run CS check
+        run: composer cs:check
+      

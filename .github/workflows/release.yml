@@ -104,15 +104,13 @@ jobs:
         run: |
           scripts/download-onnxruntime --platform ${{ matrix.platform }} --runtime ${{ matrix.runtime }} --version ${{ needs.read-version.outputs.version }}
 
-      - name: Create distribution package
+      - name: Create distribution package (Unix)
+        if: matrix.archive_ext == 'tar.gz'
         shell: bash
         run: |
-          set -e
           DIST_NAME="dist-${{ matrix.platform }}-${{ matrix.runtime }}"
-          ARCHIVE_EXT="${{ matrix.archive_ext }}"
-
           mkdir -p "${DIST_NAME}"
-
+          
           # Copy essential files
           cp -r src "${DIST_NAME}/"
           cp -r include "${DIST_NAME}/"
@@ -122,20 +120,41 @@ jobs:
           cp README.md "${DIST_NAME}/"
           cp CHANGELOG.md "${DIST_NAME}/" 2>/dev/null || true
           cp ONNXRUNTIME_VERSION "${DIST_NAME}/"
-
+          
           # Copy downloaded library
           cp -r lib "${DIST_NAME}/"
+          
+          # Create tarball
+          tar -czf "${DIST_NAME}.tar.gz" "${DIST_NAME}"
+          
+          echo "Created ${DIST_NAME}.tar.gz"
+          ls -lh "${DIST_NAME}.tar.gz"
 
-          # Create archive
-          if [ "${ARCHIVE_EXT}" = "zip" ]; then
-            zip -r "${DIST_NAME}.zip" "${DIST_NAME}"
-            echo "Created ${DIST_NAME}.zip"
-            ls -lh "${DIST_NAME}.zip"
-          else
-            tar -czf "${DIST_NAME}.tar.gz" "${DIST_NAME}"
-            echo "Created ${DIST_NAME}.tar.gz"
-            ls -lh "${DIST_NAME}.tar.gz"
-          fi
+      - name: Create distribution package (Windows)
+        if: matrix.archive_ext == 'zip'
+        shell: pwsh
+        run: |
+          $distName = "dist-${{ matrix.platform }}-${{ matrix.runtime }}"
+          New-Item -ItemType Directory -Name $distName -Force
+          
+          # Copy essential files
+          Copy-Item -Path src -Destination $distName -Recurse -Force
+          Copy-Item -Path include -Destination $distName -Recurse -Force
+          Copy-Item -Path scripts -Destination $distName -Recurse -Force
+          Copy-Item -Path composer.json -Destination $distName -Force
+          Copy-Item -Path LICENSE -Destination $distName -Force
+          Copy-Item -Path README.md -Destination $distName -Force
+          if (Test-Path CHANGELOG.md) { Copy-Item -Path CHANGELOG.md -Destination $distName -Force }
+          Copy-Item -Path ONNXRUNTIME_VERSION -Destination $distName -Force
+          
+          # Copy downloaded library
+          Copy-Item -Path lib -Destination $distName -Recurse -Force
+          
+          # Create zip
+          Compress-Archive -Path $distName -DestinationPath "${distName}.zip" -Force
+          
+          Write-Host "Created ${distName}.zip"
+          Get-ChildItem "${distName}.zip"
 
       - name: Upload to GitHub Release
         if: github.event_name == 'release'
