@@ -330,7 +330,6 @@ struct OrtApi
     OrtStatus *(*SessionOptionsAppendExecutionProvider_CUDA)(OrtSessionOptions *options, int device_id);
     OrtStatus *(*SessionOptionsAppendExecutionProvider_ROCM)(OrtSessionOptions *options, int device_id);
     OrtStatus *(*SessionOptionsAppendExecutionProvider_OpenVINO)(OrtSessionOptions *options, int device_id);
-    OrtStatus *(*SessionOptionsAppendExecutionProvider_DirectML)(OrtSessionOptions *options, int device_id);
     OrtStatus *(*SetGlobalDenormalAsZero)();
     OrtStatus *(*CreateArenaCfg)();
     void (*ReleaseArenaCfg)(OrtArenaCfg *input);
@@ -385,6 +384,5 @@ struct OrtApi
     OrtStatus *(*UpdateCUDAProviderOptions)(OrtCUDAProviderOptionsV2 *cuda_options, const char *const *provider_options_keys, const char *const *provider_options_values, size_t num_keys);
     OrtStatus *(*GetCUDAProviderOptionsAsString)(const OrtCUDAProviderOptionsV2 *cuda_options, OrtAllocator *allocator, char **ptr);
     void (*ReleaseCUDAProviderOptions)(OrtCUDAProviderOptionsV2 *input);
-    OrtStatus *(*SessionOptionsAppendExecutionProvider_MIGraphX)(OrtSessionOptions *options, int device_id);
     OrtStatus *(*SessionOptionsAppendExecutionProvider)(OrtSessionOptions *options, const char *provider_name, const char *const *provider_options_keys, const char *const *provider_options_values, size_t num_keys);
 };

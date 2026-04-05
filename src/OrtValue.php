@@ -313,12 +313,12 @@ final class OrtValue implements Disposable
      *
      * @throws InvalidOperationException For unsupported types
      */
-    public function toArray(): array
+    public function toArray(?CData $allocator = null): array
     {
         return match ($this->type) {
             OnnxType::TENSOR, OnnxType::SPARSE_TENSOR => $this->tensorToArray(),
-            OnnxType::SEQUENCE => $this->sequenceToArray(),
-            OnnxType::MAP => $this->mapToArray(),
+            OnnxType::SEQUENCE => $this->sequenceToArray($allocator),
+            OnnxType::MAP => $this->mapToArray($allocator),
             default => throw new InvalidOperationException(
                 "Cannot convert {$this->type->getName()} to array"
             ),
@@ -395,14 +395,14 @@ final class OrtValue implements Disposable
      *
      * @throws InvalidOperationException If not a sequence
      */
-    public function getSequenceElement(int $index): self
+    public function getSequenceElement(int $index, ?CData $allocator = null): self
     {
         if (!$this->type->isSequence()) {
             throw new InvalidOperationException('Not a sequence');
         }
 
         $api = Lib::api();
-        $allocator = $api->getAllocatorWithDefaultOptions();
+        $allocator ??= $api->getAllocatorWithDefaultOptions();
         $handle = $api->getValue($this->handle, $index, $allocator);
 
         return self::fromHandle($handle);
@@ -411,33 +411,36 @@ final class OrtValue implements Disposable
     /**
      * Iterate over sequence elements.
      *
-     * @param callable<self, int> $callback Function(OrtValue $value, int $index)
+     * @param callable<self, int> $callback  Function(OrtValue $value, int $index)
+     * @param null|CData          $allocator Optional allocator
      *
      * @throws InvalidOperationException If not a sequence
      */
-    public function foreachSequenceElement(callable $callback): void
+    public function foreachSequenceElement(callable $callback, ?CData $allocator = null): void
     {
         $count = $this->sequenceLength();
         for ($i = 0; $i < $count; ++$i) {
-            $callback($this->getSequenceElement($i), $i);
+            $callback($this->getSequenceElement($i, $allocator), $i);
         }
     }
 
     /**
      * Get map keys as OrtValue.
      *
+     * @param null|CData $allocator Optional allocator
+     *
      * @return self Keys tensor
      *
      * @throws InvalidOperationException If not a map
      */
-    public function mapKeys(): self
+    public function mapKeys(?CData $allocator = null): self
     {
         if (!$this->type->isMap()) {
             throw new InvalidOperationException('Not a map');
         }
 
         $api = Lib::api();
-        $allocator = $api->getAllocatorWithDefaultOptions();
+        $allocator ??= $api->getAllocatorWithDefaultOptions();
         $handle = $api->getValue($this->handle, 0, $allocator);
 
         return self::fromHandle($handle);
@@ -446,18 +449,20 @@ final class OrtValue implements Disposable
     /**
      * Get map values as OrtValue.
      *
+     * @param null|CData $allocator Optional allocator
+     *
      * @return self Values tensor or sequence
      *
      * @throws InvalidOperationException If not a map
      */
-    public function mapValues(): self
+    public function mapValues(?CData $allocator = null): self
     {
         if (!$this->type->isMap()) {
             throw new InvalidOperationException('Not a map');
         }
 
         $api = Lib::api();
-        $allocator = $api->getAllocatorWithDefaultOptions();
+        $allocator ??= $api->getAllocatorWithDefaultOptions();
         $handle = $api->getValue($this->handle, 1, $allocator);
 
         return self::fromHandle($handle);
@@ -584,20 +589,20 @@ final class OrtValue implements Disposable
         }
     }
 
-    private function sequenceToArray(): array
+    private function sequenceToArray(?CData $allocator = null): array
     {
         $result = [];
-        $this->foreachSequenceElement(static function ($value) use (&$result) {
-            $result[] = $value->toArray();
-        });
+        $this->foreachSequenceElement(static function ($value) use (&$result, $allocator) {
+            $result[] = $value->toArray($allocator);
+        }, $allocator);
 
         return $result;
     }
 
-    private function mapToArray(): array
+    private function mapToArray(?CData $allocator = null): array
     {
-        $keys = $this->mapKeys()->toArray();
-        $values = $this->mapValues()->toArray();
+        $keys = $this->mapKeys($allocator)->toArray($allocator);
+        $values = $this->mapValues($allocator)->toArray($allocator);
 
         if (\is_array($keys[0] ?? null)) {
             $keys = array_merge(...$keys);

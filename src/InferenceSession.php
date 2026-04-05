@@ -15,6 +15,7 @@ use PhpMlKit\ONNXRuntime\Exceptions\InvalidOperationException;
 use PhpMlKit\ONNXRuntime\Exceptions\NotImplementedException;
 use PhpMlKit\ONNXRuntime\FFI\Lib;
 use PhpMlKit\ONNXRuntime\Metadata\MapMetadata;
+use PhpMlKit\ONNXRuntime\Metadata\ModelMetadata;
 use PhpMlKit\ONNXRuntime\Metadata\SequenceMetadata;
 use PhpMlKit\ONNXRuntime\Metadata\TensorMetadata;
 
@@ -39,6 +40,7 @@ use PhpMlKit\ONNXRuntime\Metadata\TensorMetadata;
 class InferenceSession implements Disposable
 {
     private CData $memoryInfo;
+    private CData $allocator;
 
     /** @var array<string, MapMetadata|SequenceMetadata|TensorMetadata> */
     private array $inputMetadata = [];
@@ -48,6 +50,8 @@ class InferenceSession implements Disposable
 
     private bool $disposed = false;
 
+    private ?ModelMetadata $modelMetadata = null;
+
     /**
      * Private constructor. Use factory methods.
      *
@@ -56,7 +60,9 @@ class InferenceSession implements Disposable
     private function __construct(private CData $handle, private Environment $environment)
     {
         $api = Lib::api();
+
         $this->memoryInfo = $api->createCpuMemoryInfo(AllocatorType::ARENA_ALLOCATOR, MemoryType::DEFAULT);
+        $this->allocator = $api->getAllocatorWithDefaultOptions();
 
         $this->cacheMetadata();
     }
@@ -158,6 +164,40 @@ class InferenceSession implements Disposable
     public function outputs(): array
     {
         return $this->outputMetadata;
+    }
+
+    /**
+     * Get model metadata.
+     *
+     * Lazily loads model metadata on first call.
+     */
+    public function metadata(): ModelMetadata
+    {
+        if (null === $this->modelMetadata) {
+            $this->modelMetadata = new ModelMetadata($this);
+        }
+
+        return $this->modelMetadata;
+    }
+
+    /**
+     * Get the session handle for internal use.
+     *
+     * @internal
+     */
+    public function getHandle(): CData
+    {
+        return $this->handle;
+    }
+
+    /**
+     * Get the allocator for internal use.
+     *
+     * @internal
+     */
+    public function getAllocator(): CData
+    {
+        return $this->allocator;
     }
 
     /**
@@ -323,7 +363,6 @@ class InferenceSession implements Disposable
     private function cacheMetadata(): void
     {
         $api = Lib::api();
-        $allocator = $api->getAllocatorWithDefaultOptions();
 
         $inputCount = $api->sessionGetInputCount($this->handle);
 
@@ -331,7 +370,7 @@ class InferenceSession implements Disposable
             $typeInfo = $api->sessionGetInputTypeInfo($this->handle, $i);
 
             try {
-                $name = $api->sessionGetInputName($this->handle, $i, $allocator);
+                $name = $api->sessionGetInputName($this->handle, $i, $this->allocator);
                 $this->inputMetadata[$name] = $this->createMetadataFromTypeInfo($typeInfo);
             } finally {
                 $api->releaseTypeInfo($typeInfo);
@@ -344,7 +383,7 @@ class InferenceSession implements Disposable
             $typeInfo = $api->sessionGetOutputTypeInfo($this->handle, $i);
 
             try {
-                $name = $api->sessionGetOutputName($this->handle, $i, $allocator);
+                $name = $api->sessionGetOutputName($this->handle, $i, $this->allocator);
                 $this->outputMetadata[$name] = $this->createMetadataFromTypeInfo($typeInfo);
             } finally {
                 $api->releaseTypeInfo($typeInfo);

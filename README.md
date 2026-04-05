@@ -433,6 +433,75 @@ $outputs = $session->run($inputs, options: $runOptions);
 
 ## Working with Data
 
+### Inspecting Model Metadata
+
+Access model-level metadata to understand the model's origin, version, and custom properties:
+
+```php
+$metadata = $session->metadata();
+
+echo $metadata->getProducerName();      // e.g., 'pytorch'
+echo $metadata->getGraphName();         // e.g., 'torch-jit-export'
+echo $metadata->getDomain();            // e.g., '' or 'com.example'
+echo $metadata->getDescription();       // Model description
+echo $metadata->getGraphDescription();  // Graph-level description
+echo $metadata->getVersion();           // Version number (int)
+
+// Custom metadata key-value pairs
+$custom = $metadata->getCustomMetadataMap();
+foreach ($custom as $key => $value) {
+    echo "$key: $value\n";
+}
+```
+
+**Model Metadata Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `producerName` | string | Framework/tool that created the model |
+| `graphName` | string | Name of the computation graph |
+| `domain` | string | Model domain (namespace) |
+| `description` | string | Human-readable model description |
+| `graphDescription` | string | Graph-level description |
+| `version` | int | Model version number |
+| `customMetadataMap` | array | Key-value pairs of custom metadata |
+
+### Inspecting Node Metadata (Inputs & Outputs)
+
+Query input and output node information to understand data requirements:
+
+```php
+use PhpMlKit\ONNXRuntime\Metadata\TensorMetadata;
+use PhpMlKit\ONNXRuntime\Metadata\SequenceMetadata;
+use PhpMlKit\ONNXRuntime\Metadata\MapMetadata;
+
+$inputs = $session->inputs();
+foreach ($inputs as $name => $metadata) {
+    echo "Input: $name\n";
+    echo "  Type: " . $metadata->getType()->name . "\n";
+    
+    if ($metadata instanceof TensorMetadata) {
+        echo "  Shape: " . json_encode($metadata->getShape()) . "\n";
+        echo "  Data Type: " . $metadata->getDataType()->name . "\n";
+        echo "  Symbolic Shape: " . json_encode($metadata->getSymbolicShape()) . "\n";
+    }
+}
+
+$outputs = $session->outputs();
+
+// Or get just names
+$inputNames = $session->inputNames();
+$outputNames = $session->outputNames();
+```
+
+**Node Metadata Types:**
+
+| Type | Class | Key Properties |
+|------|-------|---------------|
+| Tensor | `TensorMetadata` | `dataType`, `shape`, `symbolicShape` |
+| Sequence | `SequenceMetadata` | `elementMetadata` |
+| Map | `MapMetadata` | `keyType`, `valueMetadata` |
+
 ### Tensors
 
 Tensors are the primary data structure in machine learning. This library supports:
@@ -460,7 +529,7 @@ Some models accept dynamic shapes (indicated by `-1` in shape):
 ```php
 // Model accepts variable-length input
 $meta = $session->inputs()['input'];
-echo $meta['shape'];  // Might be [-1] or [-1, 3, 224, 224]
+echo $meta->getShape();  // Might be [-1] or [-1, 3, 224, 224]
 
 // You can provide any size
 $input = OrtValue::fromArray([1, 2, 3], DataType::FLOAT);  // Works
@@ -554,30 +623,7 @@ $result = $sequence->toArray();  // [[1 => 10.0, 2 => 20.0], [3 => 30.0, 4 => 40
 > [!NOTE]
 > Sequences of maps only work with INT64/STRING keys and FLOAT values. Other combinations will fail.
 
-### String Tensors
-
-String tensors require special handling due to FFI complexity:
-
-```php
-// 1D string tensor
-$strings = OrtValue::fromArray(['hello', 'world'], DataType::STRING);
-
-// 2D string tensor
-$string2D = OrtValue::fromArray(
-    [['a', 'b'], ['c', 'd']], 
-    DataType::STRING
-);
-
-// Get strings back
-$result = $strings->toArray();  // ['hello', 'world']
-
-// Note: Cannot get raw data pointer for strings
-// $strings->tensorRawData();  // Throws InvalidOperationException
-```
-
 ## Type Support
-
-### DataType Enum
 
 All ONNX tensor element types are supported:
 
@@ -601,11 +647,11 @@ All ONNX tensor element types are supported:
 
 ## Memory Management
 
-This library uses a sophisticated memory management system to ensure resources are properly cleaned up while providing flexibility for advanced use cases.
+All major resources in this library implement the `Disposable` interface, providing automatic cleanup when objects go out of scope while still allowing explicit cleanup when you need to free resources early.
 
-### Automatic Cleanup (RAII)
+### Automatic Cleanup
 
-All resources implement automatic cleanup when they go out of scope:
+When a disposable resource goes out of scope or is no longer referenced, its destructor automatically releases the underlying native resources:
 
 ```php
 function processModel() {
@@ -618,24 +664,31 @@ function processModel() {
 }
 ```
 
+This RAII-style pattern means you rarely need to think about cleanup - resources are managed naturally through PHP's object lifecycle.
+
 ### Explicit Cleanup
 
-For deterministic resource management, use explicit cleanup methods:
+When you need deterministic resource management or want to free memory before a variable goes out of scope, call `dispose()`:
 
 ```php
 // Sessions
 $session = InferenceSession::fromFile('model.onnx');
 // ... use session ...
-$session->dispose();  // Release session resources
+$session->dispose();  // Release session resources immediately
 
 // OrtValues
 $tensor = OrtValue::fromArray([1, 2, 3], DataType::FLOAT);
 // ... use tensor ...
-$tensor->dispose();  // Release tensor resources
+$tensor->dispose();  // Release tensor resources immediately
 
 // Safe to call multiple times
 $tensor->dispose();  // No error, already disposed
 ```
+
+This is useful for:
+- Long-running scripts where you want to release memory as soon as possible
+- Processing large batches of data iteratively
+- Ensuring resources are freed at specific points in your code
 
 ### Internal Buffer Management
 

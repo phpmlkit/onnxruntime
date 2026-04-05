@@ -47,9 +47,24 @@ def create_identity_model(output_dir: str) -> None:
         [output_tensor]
     )
     
-    # Create model
+    # Create model with metadata
     model = helper.make_model(graph, opset_imports=[helper.make_opsetid('', 13)])
     model.ir_version = 7
+    
+    # Add model metadata
+    model.producer_name = 'onnx-test-generator'
+    model.producer_version = '1.0'
+    model.domain = 'test.onnxruntime-php'
+    model.model_version = 1
+    model.doc_string = 'Identity model for testing'
+    
+    # Add custom metadata
+    helper.set_model_props(model, {
+        'author': 'PhpMlKit\ONNXRuntime Test Suite',
+        'description': 'Simple identity operation test model',
+        'framework': 'ONNX',
+        'test_category': 'basic'
+    })
     
     # Save
     output_path = os.path.join(output_dir, 'identity.onnx')

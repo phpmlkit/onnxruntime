@@ -1598,6 +1598,211 @@ class Api
     }
 
     /**
+     * Get model metadata from session.
+     *
+     * @param CData $session OrtSession pointer
+     *
+     * @return CData OrtModelMetadata pointer
+     *
+     * @throws Exception on error
+     */
+    public function sessionGetModelMetadata(CData $session): CData
+    {
+        $modelMetadata = $this->ffi->new('OrtModelMetadata*');
+        $status = ($this->api->SessionGetModelMetadata)($session, \FFI::addr($modelMetadata));
+        Lib::checkStatus($status);
+
+        return $modelMetadata;
+    }
+
+    /**
+     * Get producer name from model metadata.
+     *
+     * @param CData $modelMetadata OrtModelMetadata pointer
+     * @param CData $allocator     OrtAllocator pointer
+     *
+     * @return CData Pointer to string (must be freed with allocator)
+     *
+     * @throws Exception on error
+     */
+    public function modelMetadataGetProducerName(CData $modelMetadata, CData $allocator): CData
+    {
+        $value = $this->ffi->new('char*');
+        $status = ($this->api->ModelMetadataGetProducerName)($modelMetadata, $allocator, \FFI::addr($value));
+        Lib::checkStatus($status);
+
+        return $value;
+    }
+
+    /**
+     * Get graph name from model metadata.
+     *
+     * @param CData $modelMetadata OrtModelMetadata pointer
+     * @param CData $allocator     OrtAllocator pointer
+     *
+     * @return CData Pointer to string (must be freed with allocator)
+     *
+     * @throws Exception on error
+     */
+    public function modelMetadataGetGraphName(CData $modelMetadata, CData $allocator): CData
+    {
+        $value = $this->ffi->new('char*');
+        $status = ($this->api->ModelMetadataGetGraphName)($modelMetadata, $allocator, \FFI::addr($value));
+        Lib::checkStatus($status);
+
+        return $value;
+    }
+
+    /**
+     * Get domain from model metadata.
+     *
+     * @param CData $modelMetadata OrtModelMetadata pointer
+     * @param CData $allocator     OrtAllocator pointer
+     *
+     * @return CData Pointer to string (must be freed with allocator)
+     *
+     * @throws Exception on error
+     */
+    public function modelMetadataGetDomain(CData $modelMetadata, CData $allocator): CData
+    {
+        $value = $this->ffi->new('char*');
+        $status = ($this->api->ModelMetadataGetDomain)($modelMetadata, $allocator, \FFI::addr($value));
+        Lib::checkStatus($status);
+
+        return $value;
+    }
+
+    /**
+     * Get description from model metadata.
+     *
+     * @param CData $modelMetadata OrtModelMetadata pointer
+     * @param CData $allocator     OrtAllocator pointer
+     *
+     * @return CData Pointer to string (must be freed with allocator)
+     *
+     * @throws Exception on error
+     */
+    public function modelMetadataGetDescription(CData $modelMetadata, CData $allocator): CData
+    {
+        $value = $this->ffi->new('char*');
+        $status = ($this->api->ModelMetadataGetDescription)($modelMetadata, $allocator, \FFI::addr($value));
+        Lib::checkStatus($status);
+
+        return $value;
+    }
+
+    /**
+     * Get graph description from model metadata.
+     *
+     * @param CData $modelMetadata OrtModelMetadata pointer
+     * @param CData $allocator     OrtAllocator pointer
+     *
+     * @return CData Pointer to string (must be freed with allocator)
+     *
+     * @throws Exception on error
+     */
+    public function modelMetadataGetGraphDescription(CData $modelMetadata, CData $allocator): CData
+    {
+        $value = $this->ffi->new('char*');
+        $status = ($this->api->ModelMetadataGetGraphDescription)($modelMetadata, $allocator, \FFI::addr($value));
+        Lib::checkStatus($status);
+
+        return $value;
+    }
+
+    /**
+     * Get version from model metadata.
+     *
+     * @param CData $modelMetadata OrtModelMetadata pointer
+     *
+     * @return int Version number
+     *
+     * @throws Exception on error
+     */
+    public function modelMetadataGetVersion(CData $modelMetadata): int
+    {
+        $version = $this->ffi->new('int64_t');
+        $status = ($this->api->ModelMetadataGetVersion)($modelMetadata, \FFI::addr($version));
+        Lib::checkStatus($status);
+
+        return $version->cdata;
+    }
+
+    /**
+     * Get custom metadata map keys.
+     *
+     * @param CData $modelMetadata OrtModelMetadata pointer
+     * @param CData $allocator     OrtAllocator pointer
+     *
+     * @return array [CData $keysPtr, int $numKeys]
+     *
+     * @throws Exception on error
+     */
+    public function modelMetadataGetCustomMetadataMapKeys(CData $modelMetadata, CData $allocator): array
+    {
+        $keys = $this->ffi->new('char**');
+        $numKeys = $this->ffi->new('int64_t');
+        $status = ($this->api->ModelMetadataGetCustomMetadataMapKeys)(
+            $modelMetadata,
+            $allocator,
+            \FFI::addr($keys),
+            \FFI::addr($numKeys)
+        );
+        Lib::checkStatus($status);
+
+        return [$keys, $numKeys->cdata];
+    }
+
+    /**
+     * Lookup value for a key in custom metadata map.
+     *
+     * @param CData  $modelMetadata OrtModelMetadata pointer
+     * @param CData  $allocator     OrtAllocator pointer
+     * @param string $key           Key to lookup
+     *
+     * @return CData Pointer to value string (must be freed with allocator)
+     *
+     * @throws Exception on error
+     */
+    public function modelMetadataLookupCustomMetadataMap(CData $modelMetadata, CData $allocator, string $key): CData
+    {
+        $value = $this->ffi->new('char*');
+        $status = ($this->api->ModelMetadataLookupCustomMetadataMap)(
+            $modelMetadata,
+            $allocator,
+            $key,
+            \FFI::addr($value)
+        );
+        Lib::checkStatus($status);
+
+        return $value;
+    }
+
+    /**
+     * Release model metadata.
+     *
+     * @param CData $modelMetadata OrtModelMetadata pointer
+     */
+    public function releaseModelMetadata(CData $modelMetadata): void
+    {
+        ($this->api->ReleaseModelMetadata)($modelMetadata);
+    }
+
+    /**
+     * Free memory allocated by allocator.
+     *
+     * @param CData $allocator OrtAllocator pointer
+     * @param CData $ptr       Pointer to free
+     */
+    public function allocatorFree(CData $allocator, CData $ptr): void
+    {
+        if (null === $ptr) {
+            return;
+        }
+        ($this->api->AllocatorFree)($allocator, $ptr);
+    }
+
+    /**
      * Get the DirectML API struct.
      *
      * @return CData OrtDmlApi pointer
