@@ -39,12 +39,15 @@ The key difference: this library exposes `OrtValue` objects directly, allowing y
   - [SessionOptions](#sessionoptions)
   - [RunOptions](#runoptions)
 - [Working with Data](#working-with-data)
+  - [Inspecting Model Metadata](#inspecting-model-metadata)
+  - [Inspecting Node Metadata](#inspecting-node-metadata)
   - [Tensors](#tensors)
   - [Sequences](#sequences)
   - [Maps](#maps)
   - [String Tensors](#string-tensors)
 - [Type Support](#type-support)
 - [Memory Management](#memory-management)
+- [Execution Providers](#execution-providers)
 - [Error Handling](#error-handling)
 - [Examples](#examples)
 - [Advanced Usage](#advanced-usage)
@@ -121,6 +124,9 @@ composer reinstall phpmlkit/onnxruntime
 
 > [!NOTE]
 > If your configured runtime is unavailable for your platform, composer will fall back to the `cpu` runtime.
+
+> [!TIP]
+> For detailed information about using CUDA, CoreML, and TensorRT providers, see the [Execution Providers](#execution-providers) section.
 
 ### Manual Library Download
 
@@ -746,6 +752,225 @@ $session2->dispose();  // Environment released (no more sessions)
 
 This is handled automatically - you don't need to manage it.
 
+## Execution Providers
+
+Execution providers are the computational backends that ONNX Runtime uses to run your models. By default, the CPU execution provider is used, which works on all platforms. For better performance, you can use hardware-accelerated providers like CUDA (NVIDIA GPUs), CoreML (Apple Neural Engine), or TensorRT (optimized NVIDIA inference).
+
+### Available Providers
+
+| Provider | Description | Runtime Required | Platforms |
+|----------|-------------|------------------|-----------|
+| **CPUExecutionProvider** | Default CPU backend | `cpu` (included by default) | All platforms |
+| **CUDAExecutionProvider** | NVIDIA GPU acceleration | `cuda12` or `cuda13` | Linux x86_64, Windows x64 |
+| **CoreMLExecutionProvider** | Apple Neural Engine/GPU | `cpu` (included on macOS) | macOS ARM64 |
+| **TensorRTExecutionProvider** | Optimized NVIDIA inference | `cuda12` or `cuda13` | Linux x86_64, Windows x64 |
+
+### Using the CPU Provider
+
+The CPU provider is the default and works out of the box on all platforms. It uses optimized CPU instructions (AVX, AVX2, AVX-512) when available.
+
+```php
+use PhpMlKit\ONNXRuntime\InferenceSession;
+use PhpMlKit\ONNXRuntime\SessionOptions;
+
+// CPU is the default - no special configuration needed
+$session = InferenceSession::fromFile('model.onnx');
+
+// Or explicitly configure for CPU
+$options = SessionOptions::default();
+$session = InferenceSession::fromFile('model.onnx', $options);
+```
+
+### Using CoreML (macOS)
+
+CoreML provider is automatically included in the CPU runtime on macOS ARM64. It accelerates inference using the Apple Neural Engine (ANE) and GPU.
+
+```php
+use PhpMlKit\ONNXRuntime\InferenceSession;
+use PhpMlKit\ONNXRuntime\SessionOptions;
+use PhpMlKit\ONNXRuntime\Providers\CoreMLProviderOptions;
+
+// Use CoreML with default settings
+$options = SessionOptions::default()
+    ->withCoreMLProvider();
+
+$session = InferenceSession::fromFile('model.onnx', $options);
+```
+
+**CoreML Configuration Options:**
+
+```php
+use PhpMlKit\ONNXRuntime\Enums\CoreMLComputeUnits;
+use PhpMlKit\ONNXRuntime\Enums\CoreMLModelFormat;
+
+// Configure CoreML for specific hardware
+$options = SessionOptions::default()
+    ->withCoreMLProvider(
+        CoreMLProviderOptions::default()
+            ->withComputeUnits(CoreMLComputeUnits::ALL)  // Use ANE + GPU + CPU
+            ->withModelFormat(CoreMLModelFormat::ML_PROGRAM)
+            ->withStaticShapes(true)  // Optimize for fixed-size inputs
+    );
+
+$session = InferenceSession::fromFile('model.onnx', $options);
+```
+
+**Compute Units:**
+- `ALL` - Use all available compute units (ANE, GPU, CPU)
+- `CPU_AND_NEURAL_ENGINE` - CPU and Apple Neural Engine only
+- `CPU_AND_GPU` - CPU and GPU only
+- `CPU_ONLY` - CPU only
+
+> [!NOTE]
+> CoreML works best with models that use standard operations. Some complex operations may fall back to CPU execution.
+
+### Using CUDA (NVIDIA GPUs)
+
+CUDA provider requires installing the CUDA runtime variant. First, switch your runtime:
+
+```bash
+# Update composer.json to use CUDA 12 or CUDA 13
+composer reinstall phpmlkit/onnxruntime
+```
+
+Then configure your session:
+
+```php
+use PhpMlKit\ONNXRuntime\InferenceSession;
+use PhpMlKit\ONNXRuntime\SessionOptions;
+use PhpMlKit\ONNXRuntime\Providers\CudaProviderOptions;
+
+// Use CUDA with default settings (device 0)
+$options = SessionOptions::default()
+    ->withCudaProvider();
+
+$session = InferenceSession::fromFile('model.onnx', $options);
+
+// Configure CUDA with specific options
+$options = SessionOptions::default()
+    ->withCudaProvider(
+        CudaProviderOptions::default()
+            ->withDeviceId(0)                    // GPU device ID
+            ->withMemoryLimit(2147483648)       // 2GB memory limit
+            ->withArenaExtendStrategy(ArenaExtendStrategy::NEXT_POWER_OF_TWO)
+            ->withCudnnConvAlgoSearch(CudnnConvAlgoSearch::HEURISTIC)
+    );
+
+$session = InferenceSession::fromFile('model.onnx', $options);
+```
+
+**CUDA Presets:**
+
+```php
+// High performance preset (may use more memory)
+$options = SessionOptions::default()
+    ->withCudaProvider(CudaProviderOptions::highPerformance());
+
+// Memory-conservative preset (slower but uses less GPU memory)
+$options = SessionOptions::default()
+    ->withCudaProvider(CudaProviderOptions::memoryConservative());
+```
+
+### Using TensorRT (Optimized NVIDIA Inference)
+
+TensorRT provides highly optimized inference for NVIDIA GPUs by compiling models specifically for your hardware. It requires the CUDA runtime and builds on top of CUDA.
+
+```php
+use PhpMlKit\ONNXRuntime\InferenceSession;
+use PhpMlKit\ONNXRuntime\SessionOptions;
+use PhpMlKit\ONNXRuntime\Providers\TensorRTProviderOptions;
+
+// Use TensorRT with default settings
+$options = SessionOptions::default()
+    ->withTensorRTProvider();
+
+$session = InferenceSession::fromFile('model.onnx', $options);
+```
+
+**TensorRT Configuration:**
+
+```php
+// Configure TensorRT with caching for faster subsequent loads
+$options = SessionOptions::default()
+    ->withTensorRTProvider(
+        TensorRTProviderOptions::default()
+            ->withCachePath('/path/to/trt_cache')     // Cache compiled engines
+            ->withMaxWorkspaceSize(2147483648)        // 2GB workspace
+            ->withFp16(true)                          // Enable FP16 precision
+            ->withInt8(true)                          // Enable INT8 precision
+            ->withMaxPartitionIterations(1000)
+            ->withMinSubgraphSize(1)
+    );
+
+$session = InferenceSession::fromFile('model.onnx', $options);
+```
+
+**TensorRT Presets:**
+
+```php
+// Maximum performance (FP16/INT8, aggressive optimization)
+$options = SessionOptions::default()
+    ->withTensorRTProvider(
+        TensorRTProviderOptions::maximumPerformance()
+    );
+
+// With caching enabled for production
+$options = SessionOptions::default()
+    ->withTensorRTProvider(
+        TensorRTProviderOptions::withCache('/app/cache/tensorrt')
+    );
+```
+
+> [!IMPORTANT]
+> TensorRT compiles models specifically for your GPU architecture. The first load of a model may take several minutes as TensorRT builds the optimized engine. Use caching to save compiled engines for faster subsequent loads.
+
+### Switching Runtime Variants
+
+To use CUDA or TensorRT providers, you need the corresponding runtime:
+
+**1. Update your `composer.json`:**
+
+```json
+{
+  "extra": {
+    "platform-packages": {
+      "phpmlkit/onnxruntime": {
+        "runtime": "cuda12"
+      }
+    }
+  }
+}
+```
+
+Available runtimes: `cpu`, `cuda12`, `cuda13`
+
+**2. Reinstall the package:**
+
+```bash
+composer reinstall phpmlkit/onnxruntime
+```
+
+> [!NOTE]
+> The CUDA runtime includes both CUDA and TensorRT providers. CoreML is included in the CPU runtime on macOS.
+
+### Checking Available Providers
+
+You can check which execution providers are available at runtime:
+
+```php
+use PhpMlKit\ONNXRuntime\FFI\Lib;
+
+$api = Lib::api();
+$providers = $api->getAvailableProviders();
+
+print_r($providers);
+// Output: ['TensorrtExecutionProvider', 'CUDAExecutionProvider', 'CPUExecutionProvider']
+```
+
+### Provider Fallback
+
+If a configured provider fails to initialize (e.g., CUDA not available), ONNX Runtime automatically falls back to the CPU provider. You can check which provider is actually being used by profiling or checking the available providers list.
+
 ## Error Handling
 
 The library provides specific exceptions for different error conditions:
@@ -774,14 +999,25 @@ try {
 }
 ```
 
-### Common Error Codes
+### Exceptions
 
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `NoSuchFileException` | Model file not found | Check file path |
-| `InvalidProtobufException` | Corrupt or non-ONNX file | Verify model format |
-| `InvalidArgumentException` | Wrong input name or shape | Check model metadata |
-| `FailException` | General runtime error | Check error message |
+All of these live under `PhpMlKit\ONNXRuntime\Exceptions` except the abstract base, which is `PhpMlKit\ONNXRuntime\Exception`.
+
+| Exception | Cause | Solution |
+|-----------|-------|----------|
+| `Exception` (abstract base) | Parent of most ONNX-specific errors | Catch this type to handle them together |
+| `FailException` | Generic ONNX Runtime failure | Read the message; inspect model and inputs |
+| `InvalidArgumentException` | Bad arguments (validation or ORT) | Check inputs, names, shapes, options |
+| `NoSuchFileException` | Model path not found | Fix the file path |
+| `InvalidProtobufException` | Invalid or corrupt ONNX model bytes | Re-export or verify the `.onnx` file |
+| `NoModelException` | Operation needs a loaded model | Ensure the session is created correctly |
+| `EngineErrorException` | Inference engine error | Read the message |
+| `RuntimeException` | ONNX Runtime `RUNTIME_EXCEPTION` (extends PHP `\RuntimeException`) | Read the message |
+| `ModelLoadedException` | Conflicts with an already-loaded model | Avoid double load / wrong API sequence |
+| `NotImplementedException` | Feature not implemented in this ORT build or in the package | Use a supported model or API |
+| `InvalidGraphException` | Invalid model graph | Fix or replace the model |
+| `ExecutionProviderException` | Execution provider failed | Check provider config, drivers, GPU |
+| `InvalidOperationException` | Wrong use of API (e.g. disposed session, wrong `OrtValue` kind) | Fix call order and resource lifetime |
 
 ## Advanced Usage
 
@@ -860,38 +1096,8 @@ for ($i = 0; $i < 100; $i++) {
 $session->dispose();  // Profile saved to my_model_profile_*.json
 ```
 
-### Execution Provider Support
-
-| Provider | Runtime | Status | Platforms |
-|----------|---------|--------|-----------|
-| **CPUExecutionProvider** | `cpu` | ✅ Included | Linux x86_64/ARM64, macOS ARM64, Windows x64 |
-| **CUDAExecutionProvider (CUDA 12)** | `cuda12` | ✅ Available | Linux x86_64, Windows x64 |
-| **CUDAExecutionProvider (CUDA 13)** | `cuda13` | ✅ Available | Linux x86_64, Windows x64 |
-| **CoreMLExecutionProvider** | `cpu` | ✅ Included | macOS ARM64 |
-| **DirectMLExecutionProvider** | N/A | 🚧 Planned | Windows x64 |
-
-**Not supported:**
-- **32-bit Systems**: Only 64-bit architectures
-- **WebAssembly**: Not supported
-
-To switch runtime variants, update your root `composer.json` and reinstall:
-
-```json
-{
-  "extra": {
-    "platform-packages": {
-      "phpmlkit/onnxruntime": {
-        "runtime": "cuda13"
-      }
-    }
-  }
-}
-```
-
-```bash
-composer reinstall phpmlkit/onnxruntime
-```
-The native ONNX Runtime library is automatically bundled for your selected runtime and platform in release artifacts. If you need to support additional platforms, please open an issue.
+> [!TIP]
+> For detailed information about execution providers (CPU, CUDA, CoreML, TensorRT), see the [Execution Providers](#execution-providers) section.
 
 ## FFI Direct Access
 
