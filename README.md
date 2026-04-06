@@ -22,10 +22,10 @@ This library is a **reimagined and optimized** version inspired by the original 
 
 - **FFI-First Architecture**: Direct FFI buffer handling for zero-copy operations with other libraries
 - **Comprehensive Type Support**: Full support for sequences, maps, and all ONNX value types
-- **First-Class NDArray Support**: Accept NDArray objects as inputs and receive them as outputs for seamless numerical computing
+- **NDArray Interoperability**: Convert between `OrtValue` and NDArray for numerical computing workflows
 - **Exposed API**: Direct access to `OrtValue` objects for inputs/outputs instead of PHP arrays only
 
-The key difference: this library exposes `OrtValue` objects directly, allowing you to pass data from other FFI libraries without the overhead of copying through PHP arrays. Combined with first-class NDArray support, this enables true zero-copy workflows when working with machine learning pipelines.
+The key difference: this library exposes `OrtValue` objects directly, allowing you to pass data from other FFI libraries without the overhead of copying through PHP arrays. NDArray users can still interoperate via `OrtValue::fromNDArray()` and `OrtValue::toNDArray()` when they explicitly want conversion.
 
 ## Table of Contents
 
@@ -280,11 +280,6 @@ $outputs = $session->run(
 // With run options
 $runOptions = RunOptions::default();
 $outputs = $session->run(['input' => $input], options: $runOptions);
-
-// With NDArray (requires phpmlkit/ndarray)
-$input = NDArray::array([1.0, 2.0, 3.0], DType::Float32);
-$outputs = $session->run(['input' => $input]);
-$result = $outputs['output']; // NDArray
 ```
 
 #### Inspecting Model Metadata
@@ -733,7 +728,6 @@ $tensor->dispose();  // Releases tensor only
 ```
 
 **Use Case:** External buffers are useful for:
-- Zero-copy NDArray integration
 - Working with C libraries
 - Pre-allocated memory pools
 
@@ -1053,22 +1047,23 @@ $tensor->dispose();  // Releases tensor only
 
 ### NDArray Interoperability
 
-When the `phpmlkit/ndarray` package is installed, you can work directly with NDArray objects without manual conversion. Pass NDArrays as inputs and receive NDArrays as outputs:
+When the `phpmlkit/ndarray` package is installed, you can convert between NDArray and `OrtValue` explicitly:
 
 ```php
 use PhpMlKit\NDArray\NDArray;
 use PhpMlKit\NDArray\DType;
+use PhpMlKit\ONNXRuntime\OrtValue;
 
 // Create NDArray input
 $input = NDArray::array([[1.0, 2.0], [3.0, 4.0]], DType::Float32);
 
-// Run inference - NDArrays in, NDArrays out
-$outputs = $session->run(['input' => $input]);
+// Run inference (InferenceSession accepts OrtValue inputs)
+$outputs = $session->run(['input' => OrtValue::fromNDArray($input)]);
 
-// Get NDArray output directly
+// Convert tensor output to NDArray when needed
 $output = $outputs['output'];
 
-echo $output;
+echo $output->toNDArray();
 // array(2, 2)
 // [1. 2.]
 // [3. 4.]

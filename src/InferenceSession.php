@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PhpMlKit\ONNXRuntime;
 
 use FFI\CData;
-use PhpMlKit\NDArray\NDArray;
 use PhpMlKit\ONNXRuntime\Contracts\Disposable;
 use PhpMlKit\ONNXRuntime\Enums\AllocatorType;
 use PhpMlKit\ONNXRuntime\Enums\MemoryType;
@@ -24,23 +23,13 @@ use PhpMlKit\ONNXRuntime\Metadata\TensorMetadata;
  *
  * Provides a clean API for running ONNX models.
  * Works with OrtValue objects as the primary data interface.
- *
- * @example
- * $session = InferenceSession::fromFile('model.onnx');
- *
- * // Create input from PHP array
- * $input = OrtValue::fromArray([1.0, 2.0, 3.0], DataType::FLOAT, [3]);
- *
- * // Run inference
- * $outputs = $session->run(['input' => $input]);
- *
- * // Convert output to PHP array
- * $result = $outputs['output']->toArray();
  */
 class InferenceSession implements Disposable
 {
     private CData $memoryInfo;
     private CData $allocator;
+
+    private ?ModelMetadata $modelMetadata = null;
 
     /** @var array<string, MapMetadata|SequenceMetadata|TensorMetadata> */
     private array $inputMetadata = [];
@@ -50,21 +39,19 @@ class InferenceSession implements Disposable
 
     private bool $disposed = false;
 
-    private ?ModelMetadata $modelMetadata = null;
-
     /**
      * Private constructor. Use factory methods.
      *
      * @param Environment $environment The environment managing this session
      */
-    private function __construct(private CData $handle, private Environment $environment)
+    private function __construct(private readonly CData $handle, private readonly Environment $environment)
     {
         $api = Lib::api();
 
         $this->memoryInfo = $api->createCpuMemoryInfo(AllocatorType::ARENA_ALLOCATOR, MemoryType::DEFAULT);
         $this->allocator = $api->getAllocatorWithDefaultOptions();
 
-        $this->cacheMetadata();
+        $this->cacheNodeMetadata();
     }
 
     public function __destruct()
@@ -116,34 +103,32 @@ class InferenceSession implements Disposable
     /**
      * Run inference.
      *
-     * Supports both OrtValue and NDArray inputs. All inputs must be of the same type.
-     * Returns outputs in the same type as the inputs.
+     * @param array<string, OrtValue> $inputs      Named input values
+     * @param null|array<string>      $outputNames Specific outputs to return (null for all)
+     * @param null|RunOptions         $options     Run options (null for defaults)
      *
-     * @template T of OrtValue|\PhpMlKit\NDArray\NDArray
+     * @return array<string, OrtValue> Named output values
      *
-     * @param array<string, T>   $inputs      Named input values (OrtValue or NDArray)
-     * @param null|array<string> $outputNames Specific outputs to return (null for all)
-     * @param null|RunOptions    $options     Run options (null for defaults)
-     *
-     * @return array<string, T> Named output values (same type as inputs)
-     *
-     * @throws InvalidArgumentException If inputs are invalid or mixed types
+     * @throws InvalidArgumentException  If inputs are invalid
+     * @throws InvalidOperationException If session is disposed
      */
     public function run(array $inputs, ?array $outputNames = null, ?RunOptions $options = null): array
     {
         $this->ensureOpen();
 
-        $inputNames = array_keys($this->inputMetadata);
-        $outputNames ??= array_keys($this->outputMetadata);
-
-        $inputType = $this->validateInputs($inputs, $inputNames);
-        $inputValues = $this->prepareInputs($inputs, $inputNames, $inputType);
-
         $api = Lib::api();
+
+        $inputNames = $this->inputNames();
+        $outputNames ??= $this->outputNames();
+
+        $this->validateInputs($inputs, $inputNames);
+
+        $inputValues = array_map(static fn ($name) => $inputs[$name], $inputNames);
         $options ??= RunOptions::default();
+
         $outputValues = $api->run($this->handle, $options, $inputNames, $inputValues, $outputNames);
 
-        return $this->prepareOutputs($outputValues, $outputNames, $inputType);
+        return array_combine($outputNames, $outputValues);
     }
 
     /**
@@ -164,6 +149,26 @@ class InferenceSession implements Disposable
     public function outputs(): array
     {
         return $this->outputMetadata;
+    }
+
+    /**
+     * Get input names.
+     *
+     * @return array<string>
+     */
+    public function inputNames(): array
+    {
+        return array_keys($this->inputMetadata);
+    }
+
+    /**
+     * Get output names.
+     *
+     * @return array<string>
+     */
+    public function outputNames(): array
+    {
+        return array_keys($this->outputMetadata);
     }
 
     /**
@@ -201,26 +206,6 @@ class InferenceSession implements Disposable
     }
 
     /**
-     * Get input names.
-     *
-     * @return array<string>
-     */
-    public function inputNames(): array
-    {
-        return array_keys($this->inputMetadata);
-    }
-
-    /**
-     * Get output names.
-     *
-     * @return array<string>
-     */
-    public function outputNames(): array
-    {
-        return array_keys($this->outputMetadata);
-    }
-
-    /**
      * Dispose the session and release resources.
      *
      * Releases the session and memory info, and decrements the environment
@@ -245,52 +230,32 @@ class InferenceSession implements Disposable
     }
 
     /**
-     * Validate inputs and detect their type.
+     * Validate inputs.
      *
      * Checks that:
-     * - All inputs are of the same type (OrtValue or NDArray)
+     * - All inputs are OrtValue objects
      * - No required inputs are missing
      * - No unexpected inputs are provided
      *
-     * @param array<string, mixed> $inputs             Named input values
-     * @param array<string>        $expectedInputNames Expected input names from model
-     *
-     * @return string 'ortvalue' or 'ndarray'
+     * @param array<string, OrtValue> $inputs             Named input values
+     * @param array<string>           $expectedInputNames Expected input names from model
      *
      * @throws InvalidArgumentException If validation fails
      */
-    private function validateInputs(array $inputs, array $expectedInputNames): string
+    private function validateInputs(array $inputs, array $expectedInputNames): void
     {
         if (empty($inputs)) {
             throw new InvalidArgumentException('Inputs cannot be empty');
         }
 
-        $inputType = null;
-        $ndarrayClass = NDArray::class;
-
         foreach ($inputs as $name => $value) {
-            $isNDArray = class_exists($ndarrayClass) && $value instanceof $ndarrayClass;
-            $isOrtValue = $value instanceof OrtValue;
-
-            if (!$isNDArray && !$isOrtValue) {
+            if (!$value instanceof OrtValue) {
                 throw new InvalidArgumentException(
-                    "Input '{$name}' must be an OrtValue or NDArray instance, "
+                    "Input '{$name}' must be an OrtValue instance, "
                         .\gettype($value).' given'
                 );
             }
-
-            $actualType = $isNDArray ? 'ndarray' : 'ortvalue';
-            $inputType ??= $actualType;
-
-            if ($actualType !== $inputType) {
-                throw new InvalidArgumentException(
-                    "Mixed input types not supported. Input '{$name}' is {$actualType}, "
-                        ."but expected all inputs to be {$inputType}"
-                );
-            }
         }
-
-        \assert(null !== $inputType);
 
         $providedNames = array_keys($inputs);
         $missing = array_diff($expectedInputNames, $providedNames);
@@ -307,60 +272,12 @@ class InferenceSession implements Disposable
                     .'. Expected: '.implode(', ', $expectedInputNames)
             );
         }
-
-        return $inputType;
-    }
-
-    /**
-     * Prepare inputs for inference.
-     *
-     * Converts NDArray inputs to OrtValue and orders them correctly.
-     *
-     * @param array<string, mixed> $inputs     Named input values
-     * @param array<string>        $inputNames Input names in order
-     * @param 'ndarray'|'ortvalue' $inputType  Input type
-     *
-     * @return array<OrtValue> OrtValues in expected order
-     */
-    private function prepareInputs(array $inputs, array $inputNames, string $inputType): array
-    {
-        $ordered = [];
-
-        foreach ($inputNames as $name) {
-            $value = $inputs[$name];
-            $ordered[] = 'ndarray' === $inputType ? OrtValue::fromNDArray($value) : $value;
-        }
-
-        return $ordered;
-    }
-
-    /**
-     * Prepare outputs after inference.
-     *
-     * Converts OrtValue outputs to NDArray if inputs were NDArray.
-     *
-     * @param array<OrtValue>      $outputValues Output values from inference
-     * @param array<string>        $outputNames  Output names in order
-     * @param 'ndarray'|'ortvalue' $inputType    Input type
-     *
-     * @return array<string, NDArray|OrtValue> Named outputs
-     */
-    private function prepareOutputs(array $outputValues, array $outputNames, string $inputType): array
-    {
-        $result = [];
-
-        foreach ($outputNames as $i => $name) {
-            $ortValue = $outputValues[$i];
-            $result[$name] = 'ndarray' === $inputType ? $ortValue->toNDArray() : $ortValue;
-        }
-
-        return $result;
     }
 
     /**
      * Cache input and output metadata.
      */
-    private function cacheMetadata(): void
+    private function cacheNodeMetadata(): void
     {
         $api = Lib::api();
 

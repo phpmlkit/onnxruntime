@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace PhpMlKit\ONNXRuntime\Tests;
 
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /**
  * @internal
- *
- * @coversNothing
  */
+#[CoversNothing]
 final class ComposerReinstallRuntimeSwitchTest extends TestCase
 {
     #[Test]

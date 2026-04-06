@@ -6,14 +6,14 @@ namespace PhpMlKit\ONNXRuntime\Tests;
 
 use PhpMlKit\ONNXRuntime\Exception;
 use PhpMlKit\ONNXRuntime\FFI\Lib;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /**
  * @internal
- *
- * @coversNothing
  */
+#[CoversNothing]
 class ApiTest extends TestCase
 {
     protected function setUp(): void

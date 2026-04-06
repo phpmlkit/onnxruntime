@@ -5,8 +5,8 @@ declare(strict_types=1);
 /**
  * Example 04: NDArray Interoperability with ONNX Runtime.
  *
- * This example demonstrates the first-class NDArray support.
- * You can now pass NDArray objects directly to run() and get NDArray objects back.
+ * This example demonstrates NDArray interoperability via OrtValue conversions.
+ * Convert NDArray -> OrtValue for inputs, and OrtValue -> NDArray for outputs.
  */
 
 require_once __DIR__.'/../vendor/autoload.php';
@@ -14,6 +14,7 @@ require_once __DIR__.'/../vendor/autoload.php';
 use PhpMlKit\NDArray\DType;
 use PhpMlKit\NDArray\NDArray;
 use PhpMlKit\ONNXRuntime\InferenceSession;
+use PhpMlKit\ONNXRuntime\OrtValue;
 
 echo "Example 04: NDArray Interoperability\n";
 echo str_repeat('=', 50)."\n\n";
@@ -31,7 +32,7 @@ $session = InferenceSession::fromFile($modelPath);
 $input = NDArray::array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], DType::Float32);
 echo 'Input: '.$input.\PHP_EOL;
 
-$outputs = $session->run(['input' => $input]);
+$outputs = $session->run(['input' => OrtValue::fromNDArray($input)]);
 
 $output = $outputs['output'];
-echo 'Output: '.$output.\PHP_EOL;
+echo 'Output: '.$output->toNDArray().\PHP_EOL;
